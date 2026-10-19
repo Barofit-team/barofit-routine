@@ -1,0 +1,10 @@
+plugins { id 'org.springframework.boot' }
+
+dependencies {
+    implementation project(':shared:runtime')
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
+}
+
+tasks.named('bootJar') { archiveFileName = 'app.jar' }
+tasks.named('bootRun') { workingDir = rootProject.projectDir }
+apply from: rootProject.file('gradle/service-isolation.gradle')

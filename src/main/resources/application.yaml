@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: routine-service
+  config:
+    import: optional:file:.env[.properties]
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/barofit}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+  jpa:
+    open-in-view: false
+    hibernate:
+      # 스키마는 Flyway만 변경
+      ddl-auto: validate
+
+barofit:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+  jwt:
+    # 키 파일은 커밋 금지(scripts/generate-jwt-keys.sh)
+    public-jwks-path: ${JWT_PUBLIC_JWKS_PATH:}
+
+server:
+  port: ${ROUTINE_PORT:3005}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: method
+    urls:
+      - name: Routine Service
+        url: /v3/api-docs
+      - name: Identity Service
+        url: /identity/v3/api-docs
