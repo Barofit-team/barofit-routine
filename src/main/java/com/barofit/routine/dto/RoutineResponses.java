@@ -11,18 +11,22 @@ public final class RoutineResponses {
     private RoutineResponses() {}
 
     @Schema(name = "ExerciseSummary")
-    public record ExerciseSummary(String id, String name, MeasurementType measurementType, String description) {
+    public record ExerciseSummary(String id, String name, MeasurementType measurementType, String description,
+                                  RoutineCategory category, Equipment equipment, AssessmentStatus assessmentStatus) {
         public static ExerciseSummary from(Exercise e) {
-            return new ExerciseSummary(e.getId(), e.getName(), e.getMeasurementType(), e.getDescription());
+            return new ExerciseSummary(e.getId(), e.getName(), e.getMeasurementType(), e.getDescription(),
+                e.getCategory(), e.getEquipment(), e.getAssessmentStatus());
         }
     }
 
     @Schema(name = "ExerciseDetail")
     public record ExerciseDetail(String id, String name, MeasurementType measurementType, String description,
+                                 RoutineCategory category, Equipment equipment, AssessmentStatus assessmentStatus,
                                  String preparation, String instructions, String precautions,
                                  @Schema(description = "운동 시작 전 TTS로 읽을 공통 안내 원문") String introTtsText) {
         public static ExerciseDetail from(Exercise e) {
             return new ExerciseDetail(e.getId(), e.getName(), e.getMeasurementType(), e.getDescription(),
+                e.getCategory(), e.getEquipment(), e.getAssessmentStatus(),
                 e.getPreparation(), e.getInstructions(), e.getPrecautions(), e.getIntroTtsText());
         }
     }
@@ -38,11 +42,13 @@ public final class RoutineResponses {
 
     @Schema(name = "RoutineExerciseDetail")
     public record ExerciseItem(UUID id, String exerciseId, String name, MeasurementType measurementType,
-                               int order, String preparation, String instructions, String precautions,
+                               int order, RoutineCategory category, Equipment equipment, AssessmentStatus assessmentStatus,
+                               String preparation, String instructions, String precautions,
                                String introTtsText, List<SetItem> sets) {
         public static ExerciseItem from(RoutineExercise r) {
             Exercise e = r.getExercise();
             return new ExerciseItem(r.getId(), e.getId(), e.getName(), e.getMeasurementType(), r.getExerciseOrder(),
+                e.getCategory(), e.getEquipment(), e.getAssessmentStatus(),
                 e.getPreparation(), e.getInstructions(), e.getPrecautions(), e.getIntroTtsText(),
                 r.getSets().stream().map(SetItem::from).toList());
         }

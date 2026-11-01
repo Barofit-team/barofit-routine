@@ -16,6 +16,7 @@ import java.util.*;
 @Transactional(readOnly = true)
 public class RoutineService {
     private final RoutineRepository routines;
+    private final ExerciseRepository exercises;
 
     public RoutinePage list(UUID userId, int page, int size) {
         var result = routines.findByOwnerUserIdAndType(userId, RoutineType.USER,
@@ -25,6 +26,12 @@ public class RoutineService {
     }
 
     public Detail detail(UUID userId, UUID id) { return Detail.from(owned(userId, id)); }
+
+    public Detail template(UUID id) {
+        return routines.findByIdAndType(id, RoutineType.TEMPLATE)
+            .map(Detail::from)
+            .orElseThrow(() -> new RoutineException(RoutineErrorCode.TEMPLATE_NOT_FOUND));
+    }
 
     public List<Detail> templates(Difficulty difficulty, RoutineCategory category) {
         var templates = difficulty == null
@@ -62,7 +69,7 @@ public class RoutineService {
             CreateExercise change = changes.remove(source.getId());
             if (change != null) {
                 validateGoals(item, change);
-                item.customize(change.setCount(), change.targetReps(), change.targetDurationSeconds());
+                item.customize(change.setCount(), change.targetReps(), change.targetDurationSeconds(), change.restSeconds());
             }
             routine.addExercise(item);
         }
@@ -76,7 +83,7 @@ public class RoutineService {
         Map<UUID, RoutineExercise> items = new HashMap<>();
         routine.getExercises().forEach(item -> items.put(item.getId(), item));
         Set<UUID> seen = new HashSet<>();
-        // 전체 요청을 검증한 뒤 변경한다. 루틴의 구성이나 템플릿은 교체하지 않는다.
+        // 전체 요청을 검증한 뒤 변경한다.
         for (UpdateExercise input : request.exercises()) {
             RoutineExercise item = items.get(input.routineExerciseId());
             if (item == null || !seen.add(input.routineExerciseId())) {
@@ -86,10 +93,48 @@ public class RoutineService {
         }
         routine.touch();
         for (UpdateExercise input : request.exercises()) {
-            items.get(input.routineExerciseId()).customize(input.setCount(), input.targetReps(), input.targetDurationSeconds());
+            items.get(input.routineExerciseId()).customize(input.setCount(), input.targetReps(),
+                input.targetDurationSeconds(), input.restSeconds());
         }
         routines.flush();
         return Detail.from(routine);
+    }
+
+    public List<ExerciseSummary> replacementCandidates(UUID userId, UUID routineId, UUID routineExerciseId) {
+        Routine routine = owned(userId, routineId);
+        RoutineExercise current = findExercise(routine, routineExerciseId);
+        Set<String> used = new HashSet<>();
+        routine.getExercises().forEach(item -> used.add(item.getExercise().getId()));
+        return exercises.findByActiveTrueOrderByDisplayOrderAsc().stream()
+            .filter(candidate -> similar(current.getExercise(), candidate) && !used.contains(candidate.getId()))
+            .map(ExerciseSummary::from).toList();
+    }
+
+    @Transactional
+    public Detail replaceExercise(UUID userId, UUID routineId, UUID routineExerciseId, String exerciseId) {
+        Routine routine = owned(userId, routineId);
+        RoutineExercise current = findExercise(routine, routineExerciseId);
+        Exercise replacement = exercises.findByIdAndActiveTrue(exerciseId)
+            .orElseThrow(() -> new RoutineException(RoutineErrorCode.EXERCISE_NOT_FOUND));
+        if (!similar(current.getExercise(), replacement))
+            throw RoutineException.invalid("같은 분류·측정 방식·필요 기구의 종목으로만 교체할 수 있습니다.");
+        if (routine.getExercises().stream().anyMatch(item -> item.getExercise().getId().equals(exerciseId)))
+            throw RoutineException.invalid("이미 루틴에 포함된 종목입니다.");
+        current.replaceExercise(replacement);
+        routine.touch();
+        routines.flush();
+        return Detail.from(routine);
+    }
+
+    private RoutineExercise findExercise(Routine routine, UUID id) {
+        return routine.getExercises().stream().filter(item -> item.getId().equals(id)).findFirst()
+            .orElseThrow(() -> RoutineException.invalid("루틴에 없는 종목입니다."));
+    }
+
+    private boolean similar(Exercise current, Exercise candidate) {
+        return current.getCategory() == candidate.getCategory()
+            && current.getMeasurementType() == candidate.getMeasurementType()
+            && current.getEquipment() == candidate.getEquipment();
     }
 
     @Transactional
@@ -104,8 +149,9 @@ public class RoutineService {
     }
 
     private void validateGoals(RoutineExercise item, Goals goals) {
-        if (goals.setCount() == null && goals.targetReps() == null && goals.targetDurationSeconds() == null) {
-            throw RoutineException.invalid("세트 수 또는 목표를 하나 이상 입력해 주세요.");
+        if (goals.setCount() == null && goals.targetReps() == null && goals.targetDurationSeconds() == null
+            && goals.restSeconds() == null) {
+            throw RoutineException.invalid("세트 수·목표·휴식 중 하나 이상 입력해 주세요.");
         }
         if (item.getSets().isEmpty()) throw RoutineException.invalid("세트 구성이 없는 종목입니다.");
         MeasurementType type = item.getExercise().getMeasurementType();

@@ -15,6 +15,7 @@ public final class RoutineRequests {
         Integer setCount();
         Integer targetReps();
         Integer targetDurationSeconds();
+        Integer restSeconds();
     }
 
     @Schema(name = "CreateRoutineRequest", description = "템플릿에서 생성. exercises 생략/null/빈 배열이면 기본 구성 그대로 저장. 미지정 종목은 유지.")
@@ -25,30 +26,37 @@ public final class RoutineRequests {
         @JsonAnySetter public void unknown(String field, Object value) { reject(field); }
     }
 
-    @Schema(name = "TemplateExerciseCustomization", description = "템플릿 상세의 exercises[].id 사용. 지정한 목표는 해당 종목의 모든 세트에 동일하게 적용. 생략/null인 목표는 유지.")
+    @Schema(name = "TemplateExerciseCustomization", description = "템플릿 상세의 exercises[].id 사용. 지정한 목표와 휴식은 해당 종목의 모든 세트에 적용. 생략/null인 값은 유지.")
     public record CreateExercise(
         @NotNull UUID templateExerciseId,
         @JsonDeserialize(using = StrictIntegerDeserializer.class) @Min(1) @Max(20) Integer setCount,
         @JsonDeserialize(using = StrictIntegerDeserializer.class) @Positive @Schema(description = "반복 기반 운동에만 사용") Integer targetReps,
-        @JsonDeserialize(using = StrictIntegerDeserializer.class) @Positive @Schema(description = "시간 기반 운동에만 사용. 초 단위") Integer targetDurationSeconds
+        @JsonDeserialize(using = StrictIntegerDeserializer.class) @Positive @Schema(description = "시간 기반 운동에만 사용. 초 단위") Integer targetDurationSeconds,
+        @JsonDeserialize(using = StrictIntegerDeserializer.class) @Min(0) @Max(600) @Schema(description = "세트 후 휴식 초. 해당 종목의 모든 세트에 적용") Integer restSeconds
     ) implements Goals {
         @JsonAnySetter public void unknown(String field, Object value) { reject(field); }
     }
 
-    @Schema(name = "UpdateRoutineRequest", description = "지정한 종목의 세트 수·목표만 부분 수정. 미지정 종목은 유지. 종목 추가·삭제·교체·순서 변경 불가.")
+    @Schema(name = "UpdateRoutineRequest", description = "지정한 종목의 세트 수·목표·휴식을 부분 수정. 미지정 종목은 유지.")
     public record Update(
         @NotEmpty @Size(max = 20) List<@NotNull @Valid UpdateExercise> exercises
     ) {
         @JsonAnySetter public void unknown(String field, Object value) { reject(field); }
     }
 
-    @Schema(name = "RoutineExerciseCustomization", description = "내 루틴 상세의 exercises[].id 사용. 목표는 모든 세트에 동일하게 적용. 생략/null인 값은 유지.")
+    @Schema(name = "RoutineExerciseCustomization", description = "내 루틴 상세의 exercises[].id 사용. 목표와 휴식은 모든 세트에 동일하게 적용. 생략/null인 값은 유지.")
     public record UpdateExercise(
         @NotNull UUID routineExerciseId,
         @JsonDeserialize(using = StrictIntegerDeserializer.class) @Min(1) @Max(20) Integer setCount,
         @JsonDeserialize(using = StrictIntegerDeserializer.class) @Positive Integer targetReps,
-        @JsonDeserialize(using = StrictIntegerDeserializer.class) @Positive Integer targetDurationSeconds
+        @JsonDeserialize(using = StrictIntegerDeserializer.class) @Positive Integer targetDurationSeconds,
+        @JsonDeserialize(using = StrictIntegerDeserializer.class) @Min(0) @Max(600) Integer restSeconds
     ) implements Goals {
+        @JsonAnySetter public void unknown(String field, Object value) { reject(field); }
+    }
+
+    @Schema(name = "ReplaceRoutineExerciseRequest", description = "동일 분류·측정 방식·필요 기구의 종목으로 교체")
+    public record ReplaceExercise(@NotBlank String exerciseId) {
         @JsonAnySetter public void unknown(String field, Object value) { reject(field); }
     }
 

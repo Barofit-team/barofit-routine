@@ -41,4 +41,7 @@ public class RoutineSet {
         if (reps != null) this.targetReps = reps;
         if (duration != null) this.targetDurationSeconds = duration;
     }
+    public void changeRest(Integer seconds) {
+        if (seconds != null) this.restSeconds = seconds;
+    }
 }

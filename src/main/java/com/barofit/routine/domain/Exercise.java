@@ -19,6 +19,15 @@ public class Exercise {
     private String name;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
+    private RoutineCategory category;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private Equipment equipment;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private AssessmentStatus assessmentStatus;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
     private MeasurementType measurementType;
     @Column(nullable = false, columnDefinition = "text")
     private String description;

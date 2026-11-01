@@ -39,15 +39,19 @@ public class RoutineExercise {
 
     public List<RoutineSet> getSets() { return Collections.unmodifiableList(sets); }
     public void addSet(RoutineSet set) { sets.add(set); }
-    /** 종목 ID와 순서를 유지하며 세트 수와 목표만 변경한다. 늘어난 세트는 마지막 세트 설정을 복사한다. */
-    public void customize(Integer setCount, Integer reps, Integer duration) {
+    /** 종목 ID와 순서를 유지하며 세트 수·목표·휴식을 변경한다. 늘어난 세트는 마지막 세트 설정을 복사한다. */
+    public void customize(Integer setCount, Integer reps, Integer duration, Integer restSeconds) {
         int count = setCount == null ? sets.size() : setCount;
         while (sets.size() > count) sets.remove(sets.size() - 1);
-        for (RoutineSet set : sets) set.changeTarget(reps, duration);
+        for (RoutineSet set : sets) {
+            set.changeTarget(reps, duration);
+            set.changeRest(restSeconds);
+        }
         while (sets.size() < count) {
             RoutineSet last = sets.getLast();
             sets.add(new RoutineSet(this, sets.size() + 1, last.getTargetReps(),
                 last.getTargetDurationSeconds(), last.getWeightKg(), last.getRestSeconds()));
         }
     }
+    public void replaceExercise(Exercise replacement) { this.exercise = replacement; }
 }
