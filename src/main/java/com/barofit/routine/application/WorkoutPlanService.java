@@ -4,7 +4,7 @@ import com.barofit.routine.domain.*;
 import com.barofit.routine.dto.RoutineResponses.Detail;
 import com.barofit.routine.dto.RoutineResponses.ExerciseItem;
 import com.barofit.routine.repository.*;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import java.math.BigDecimal;
 import java.net.http.HttpClient;
 import java.time.*;
@@ -135,7 +135,7 @@ public class WorkoutPlanService {
             if (me == null || !userId.toString().equals(me.path("id").asText())
                 || !me.path("profile").path("weightKg").isNumber()) return null;
             return me.path("profile").path("weightKg").decimalValue();
-        } catch (RestClientException e) {
+        } catch (Exception e) {
             // identity가 잠시 불가해도 계획과 예상 시간은 조회할 수 있다.
             return null;
         }

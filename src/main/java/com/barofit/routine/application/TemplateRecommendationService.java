@@ -3,7 +3,7 @@ package com.barofit.routine.application;
 import com.barofit.routine.domain.*;
 import com.barofit.routine.dto.RoutineResponses.Detail;
 import com.barofit.routine.repository.RoutineRepository;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.*;
@@ -37,7 +37,7 @@ public class TemplateRecommendationService {
         try {
             me = identity.get().uri("/api/v1/users/me").headers(h -> h.setBearerAuth(accessToken))
                 .retrieve().body(JsonNode.class);
-        } catch (RestClientException e) {
+        } catch (Exception e) {
             throw new RoutineException(RoutineErrorCode.PROFILE_UNAVAILABLE);
         }
         if (me == null || !userId.toString().equals(me.path("id").asText())) {
