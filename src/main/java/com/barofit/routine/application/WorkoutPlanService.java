@@ -135,7 +135,7 @@ public class WorkoutPlanService {
             if (me == null || !userId.toString().equals(me.path("id").asText())
                 || !me.path("profile").path("weightKg").isNumber()) return null;
             return me.path("profile").path("weightKg").decimalValue();
-        } catch (Exception e) {
+        } catch (RestClientException e) {
             // identity가 잠시 불가해도 계획과 예상 시간은 조회할 수 있다.
             return null;
         }

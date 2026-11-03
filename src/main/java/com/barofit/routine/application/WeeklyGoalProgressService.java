@@ -39,7 +39,7 @@ public class WeeklyGoalProgressService {
         try {
             me = identity.get().uri("/api/v1/users/me").headers(h -> h.setBearerAuth(accessToken))
                 .retrieve().body(JsonNode.class);
-        } catch (Exception e) {
+        } catch (RestClientException e) {
             throw new RoutineException(RoutineErrorCode.PROFILE_UNAVAILABLE);
         }
         if (me == null || !userId.toString().equals(me.path("id").asText()))
@@ -52,7 +52,7 @@ public class WeeklyGoalProgressService {
             progress = workout.get().uri(uri -> uri.path("/api/v1/workout-sessions/weekly-progress")
                 .queryParam("weekStart", weekStart).build())
                 .headers(h -> h.setBearerAuth(accessToken)).retrieve().body(JsonNode.class);
-        } catch (Exception e) {
+        } catch (RestClientException e) {
             throw new RoutineException(RoutineErrorCode.WORKOUT_UNAVAILABLE);
         }
         if (progress == null || !weekStart.toString().equals(progress.path("weekStart").asText())

@@ -37,7 +37,7 @@ public class TemplateRecommendationService {
         try {
             me = identity.get().uri("/api/v1/users/me").headers(h -> h.setBearerAuth(accessToken))
                 .retrieve().body(JsonNode.class);
-        } catch (Exception e) {
+        } catch (RestClientException e) {
             throw new RoutineException(RoutineErrorCode.PROFILE_UNAVAILABLE);
         }
         if (me == null || !userId.toString().equals(me.path("id").asText())) {
