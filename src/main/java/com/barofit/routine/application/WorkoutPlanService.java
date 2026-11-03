@@ -4,7 +4,7 @@ import com.barofit.routine.domain.*;
 import com.barofit.routine.dto.RoutineResponses.Detail;
 import com.barofit.routine.dto.RoutineResponses.ExerciseItem;
 import com.barofit.routine.repository.*;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import java.math.BigDecimal;
 import java.net.http.HttpClient;
 import java.time.*;

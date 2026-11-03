@@ -3,7 +3,7 @@ package com.barofit.routine.application;
 import com.barofit.routine.domain.*;
 import com.barofit.routine.dto.RoutineResponses.Detail;
 import com.barofit.routine.repository.RoutineRepository;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.*;

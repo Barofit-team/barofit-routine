@@ -1,7 +1,7 @@
 package com.barofit.routine.application;
 
 import com.barofit.routine.application.RoutineErrorCode;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.time.LocalDate;
