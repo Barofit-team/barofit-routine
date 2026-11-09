@@ -1,0 +1,17 @@
+.git
+.gradle
+.idea
+**/build
+**/out
+.env
+.env.*
+.[eE][nN][vV]
+.[eE][nN][vV].*
+*.log
+keys
+*.pem
+*.key
+*.p8
+*.p12
+*.jks
+*.keystore
