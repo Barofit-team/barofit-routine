@@ -3,16 +3,16 @@ name: CI
 # ------------------------------------------------------------------------------------------
 # 최소 CI 워크플로우 (barofit 백엔드 서비스 공통 템플릿)
 #
-# 지금 여기서 하는 일: PR이 dev로 들어올 때 포맷(spotlessCheck)과 단위 테스트(test)만 돌린다.
+# 지금 여기서 하는 일: PR이 dev 또는 main으로 들어올 때 포맷(spotlessCheck)과 단위 테스트(test)만 돌린다.
 # integrationTest(Testcontainers)는 아직 포함하지 않았다 — 의도적으로 "최소" 범위로 남겨뒀다.
 # CI/CD를 맡을 팀원이 아래 TODO들을 보고 필요한 순서대로 확장하면 된다.
 # ------------------------------------------------------------------------------------------
 
 on:
   pull_request:
-    branches: [dev]
+    branches: [dev, main]
   push:
-    branches: [dev]
+    branches: [dev, main]
 
 permissions:
   contents: read
