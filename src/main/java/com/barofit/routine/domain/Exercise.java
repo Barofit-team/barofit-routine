@@ -1,10 +1,10 @@
 package com.barofit.routine.domain;
 
 import jakarta.persistence.*;
+import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import java.time.Instant;
 
 @Entity
 @org.hibernate.annotations.BatchSize(size = 50)
@@ -12,39 +12,53 @@ import java.time.Instant;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Exercise {
-    @Id
-    @Column(length = 50)
-    private String id;
-    @Column(nullable = false, length = 100)
-    private String name;
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private RoutineCategory category;
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private Equipment equipment;
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private AssessmentStatus assessmentStatus;
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private MeasurementType measurementType;
-    @Column(nullable = false, columnDefinition = "text")
-    private String description;
-    @Column(nullable = false, columnDefinition = "text")
-    private String preparation;
-    @Column(nullable = false, columnDefinition = "text")
-    private String instructions;
-    @Column(nullable = false, columnDefinition = "text")
-    private String precautions;
-    @Column(nullable = false, columnDefinition = "text")
-    private String introTtsText;
-    @Column(nullable = false)
-    private int displayOrder;
-    @Column(nullable = false)
-    private boolean active;
-    @Column(nullable = false)
-    private Instant createdAt;
-    @Column(nullable = false)
-    private Instant updatedAt;
+  @Id
+  @Column(length = 50)
+  private String id;
+
+  @Column(nullable = false, length = 100)
+  private String name;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private RoutineCategory category;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private Equipment equipment;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private AssessmentStatus assessmentStatus;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private MeasurementType measurementType;
+
+  @Column(nullable = false, columnDefinition = "text")
+  private String description;
+
+  @Column(nullable = false, columnDefinition = "text")
+  private String preparation;
+
+  @Column(nullable = false, columnDefinition = "text")
+  private String instructions;
+
+  @Column(nullable = false, columnDefinition = "text")
+  private String precautions;
+
+  @Column(nullable = false, columnDefinition = "text")
+  private String introTtsText;
+
+  @Column(nullable = false)
+  private int displayOrder;
+
+  @Column(nullable = false)
+  private boolean active;
+
+  @Column(nullable = false)
+  private Instant createdAt;
+
+  @Column(nullable = false)
+  private Instant updatedAt;
 }

@@ -8,7 +8,8 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface WorkoutPlanRepository extends JpaRepository<WorkoutPlan, UUID> {
-    Optional<WorkoutPlan> findByOwnerUserIdAndPlanDate(UUID ownerUserId, LocalDate date);
-    List<WorkoutPlan> findByOwnerUserIdAndPlanDateBetweenOrderByPlanDateAsc(
-        UUID ownerUserId, LocalDate start, LocalDate end);
+  Optional<WorkoutPlan> findByOwnerUserIdAndPlanDate(UUID ownerUserId, LocalDate date);
+
+  List<WorkoutPlan> findByOwnerUserIdAndPlanDateBetweenOrderByPlanDateAsc(
+      UUID ownerUserId, LocalDate start, LocalDate end);
 }
