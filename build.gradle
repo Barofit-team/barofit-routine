@@ -30,16 +30,53 @@ dependencyManagement {
     }
 }
 
+sourceSets {
+    integrationTest {
+        java.srcDir 'src/integrationTest/java'
+        resources.srcDir 'src/integrationTest/resources'
+        compileClasspath += sourceSets.main.output + sourceSets.test.output
+        runtimeClasspath += sourceSets.main.output + sourceSets.test.output
+    }
+}
+
+configurations {
+    integrationTestImplementation.extendsFrom testImplementation
+    integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
 dependencies {
     implementation 'com.barofit:barofit-runtime:0.0.1-SNAPSHOT'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
 
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // 이 레포 자신의 컴포넌트/통합 테스트 (barofit-infra에서 이전, Testcontainers 기반)
+    integrationTestImplementation('com.barofit:barofit-runtime:0.0.1-SNAPSHOT') {
+        capabilities {
+            requireCapability('com.barofit:runtime-test-fixtures')
+        }
+    }
 }
+
+tasks.register('integrationTest', Test) {
+    description = '이 레포 자신의 컴포넌트 통합 테스트 (Testcontainers, Docker 필요)'
+    group = 'verification'
+    testClassesDirs = sourceSets.integrationTest.output.classesDirs
+    classpath = sourceSets.integrationTest.runtimeClasspath
+    useJUnitPlatform()
+    shouldRunAfter test
+    jvmArgumentProviders.add(
+        { ["-Dbarofit.test.postgres-image=postgres:18.6"] } as CommandLineArgumentProvider)
+}
+
+tasks.named('check') { dependsOn integrationTest }
 
 tasks.named('test') { useJUnitPlatform() }
 
