@@ -1,0 +1,110 @@
+name: BaroFit ECR Build and Publish
+
+on:
+  pull_request:
+    branches: [dev, main]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish image to ECR"
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout service
+        uses: actions/checkout@v4
+
+      - name: Checkout common module
+        uses: actions/checkout@v4
+        with:
+          repository: Barofit-team/barofit-common
+          path: barofit-common
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Publish common module locally
+        working-directory: barofit-common
+        run: ./gradlew publishToMavenLocal --no-daemon
+
+      - name: Prepare Docker Maven dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .m2-cache/com
+          cp -a "$HOME/.m2/repository/com/barofit" .m2-cache/com/
+
+      - name: Build Docker image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --platform linux/amd64 \
+            -t barofit-routine:ci .
+
+      - name: Verify ECR deployment prerequisites
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true }}
+        env:
+          ROLE_ARN: ${{ vars.AWS_ECR_ROLE_ARN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "$GITHUB_REF" != "refs/heads/dev" ]; then
+            echo "Publishing is restricted to dev."
+            exit 1
+          fi
+
+          if [ -z "$ROLE_ARN" ]; then
+            echo "AWS_ECR_ROLE_ARN is not configured."
+            exit 1
+          fi
+
+      - name: Configure AWS OIDC credentials
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ECR_ROLE_ARN }}
+          aws-region: ap-northeast-2
+
+      - name: Login to Amazon ECR
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true }}
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Push Docker image
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true }}
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          EXPECTED="373514675861.dkr.ecr.ap-northeast-2.amazonaws.com"
+
+          if [ "$ECR_REGISTRY" != "$EXPECTED" ]; then
+            echo "Unexpected ECR registry."
+            exit 1
+          fi
+
+          TAG="${GITHUB_SHA:0:7}"
+          IMAGE="$ECR_REGISTRY/barofit-routine:$TAG"
+
+          docker tag barofit-routine:ci "$IMAGE"
+          docker push "$IMAGE"
+
+          echo "Published: $IMAGE"
