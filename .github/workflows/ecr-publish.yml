@@ -64,8 +64,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ "$GITHUB_REF" != "refs/heads/dev" ]; then
-            echo "Publishing is restricted to dev."
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Publishing is restricted to main."
             exit 1
           fi
 
