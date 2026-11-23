@@ -3,9 +3,15 @@ name: CI
 # ------------------------------------------------------------------------------------------
 # 최소 CI 워크플로우 (barofit 백엔드 서비스 공통 템플릿)
 #
-# 지금 여기서 하는 일: PR이 dev 또는 main으로 들어올 때 포맷(spotlessCheck)과 단위 테스트(test)만 돌린다.
+# 지금 여기서 하는 일: PR이 dev 또는 main으로 들어올 때, 그리고 barofit-common이 새로 발행될 때
+# (repository_dispatch) 포맷(spotlessCheck)과 단위 테스트(test)만 돌린다.
 # integrationTest(Testcontainers)는 아직 포함하지 않았다 — 의도적으로 "최소" 범위로 남겨뒀다.
 # CI/CD를 맡을 팀원이 아래 TODO들을 보고 필요한 순서대로 확장하면 된다.
+#
+# barofit-common은 GitHub Packages(com.barofit:barofit-runtime)로 발행되고, 이 레포는
+# build.gradle repositories의 GitHubPackages 항목으로 그걸 직접 받는다(mavenLocal()보다 뒤에
+# 선언돼 있어 로컬에서 publishToMavenLocal을 해두면 그게 먼저 잡힌다). common이 새로 발행되면
+# publish.yml이 이 레포에 repository_dispatch(common-published)를 보내 아래 잡을 재실행시킨다.
 # ------------------------------------------------------------------------------------------
 
 on:
@@ -13,9 +19,12 @@ on:
     branches: [dev, main]
   push:
     branches: [dev, main]
+  repository_dispatch:
+    types: [common-published]
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   build-and-test:
@@ -23,29 +32,6 @@ jobs:
     steps:
       - name: 이 서비스 레포 checkout
         uses: actions/checkout@v4
-
-      # ----------------------------------------------------------------------------------
-      # barofit-common 임시 체크아웃 + publishToMavenLocal
-      #
-      # 이 서비스의 build.gradle은 repositories { mavenLocal() }로 barofit-common을 참조한다.
-      # barofit-common이 아직 GitHub Packages 같은 원격 레지스트리에 배포되지 않고 있어서,
-      # CI 러너(매번 새로 뜨는, 비어 있는 mavenLocal)에서도 빌드가 되려면 실행마다 common을
-      # 직접 받아 publishToMavenLocal로 올려줘야 한다. 로컬 개발자가 작업 시작 전에 하는
-      # "barofit-common에서 publishToMavenLocal 먼저" 절차를 CI에서 그대로 흉내낸 임시방편이다.
-      #
-      # TODO(CICD 담당자): barofit-common이 GitHub Packages로 배포되기 시작하면
-      #   1) 아래 "barofit-common checkout" + "barofit-common publishToMavenLocal" 두 스텝을 삭제
-      #   2) 이 서비스의 build.gradle repositories에 GitHub Packages maven { url; credentials } 추가
-      #   3) 이 워크플로우에 `permissions: packages: read`와 GITHUB_TOKEN(또는 read:packages PAT)
-      #      인증을 추가
-      #   로 교체한다. 그러면 매번 common을 체크아웃/빌드하지 않고 버전 고정된 아티팩트를
-      #   그대로 받아쓸 수 있어 빌드 시간도 줄어든다.
-      # ----------------------------------------------------------------------------------
-      - name: barofit-common checkout (임시 — 위 TODO 참고)
-        uses: actions/checkout@v4
-        with:
-          repository: Barofit-team/barofit-common
-          path: barofit-common
 
       - name: JDK 21 설정
         uses: actions/setup-java@v4
@@ -56,15 +42,17 @@ jobs:
       - name: Gradle 설정/캐시
         uses: gradle/actions/setup-gradle@v4
 
-      - name: barofit-common publishToMavenLocal
-        working-directory: barofit-common
-        run: ./gradlew publishToMavenLocal --no-daemon
-
       - name: 포맷 검사 (spotlessCheck)
-        run: ./gradlew spotlessCheck --no-daemon
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./gradlew spotlessCheck --no-daemon --refresh-dependencies
 
       - name: 단위 테스트 (test)
-        run: ./gradlew test --no-daemon
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./gradlew test --no-daemon --refresh-dependencies
 
       # ----------------------------------------------------------------------------------
       # 여기까지가 "최소" 범위. 아래는 다음에 추가하면 좋을 것들 — 대략 우선순위 순서.
@@ -78,9 +66,10 @@ jobs:
       #    build-and-test에 의존하는 별도 job으로 분리해 가독성 있게 관리하는 걸 권장.
       #
       # 2. 캐시 최적화
-      #    gradle/actions/setup-gradle@v4가 기본으로 ~/.gradle/caches를 캐시해주지만,
-      #    barofit-common을 매번 새로 체크아웃+퍼블리시하는 지금 구조에서는 캐시 효율이
-      #    떨어진다. 위 GitHub Packages 전환(TODO) 이후에는 캐시 적중률이 크게 좋아질 것.
+      #    GitHub Packages 전환 후에도 매 실행마다 --refresh-dependencies로 SNAPSHOT을 강제
+      #    재수신하고 있어 setup-gradle의 의존성 캐시 적중률이 완전하진 않다. common 쪽에
+      #    고유 버전(커밋 SHA 기반 등)을 도입하면 이 플래그 없이도 정확한 최신 버전을 받을 수
+      #    있어 캐시 효율이 더 좋아질 것 — 지금은 범위 밖으로 남겨둠.
       #
       # 3. 브랜치 보호 규칙과 연동 (필수 상태 검사)
       #    barofit-team 조직의 dev 브랜치 보호 규칙(1인 승인 필수)에 이 워크플로우를
