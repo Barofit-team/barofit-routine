@@ -138,12 +138,15 @@ class RoutineApiTests {
             "burpee",
             "sit-up");
     mvc.perform(get("/api/v1/exercises/knee-push-up")).andExpect(status().isNotFound());
-    String mixed = "00000000-0000-0000-0000-000000000104";
+    // V14 이후 104(초급 상체 밀기)는 23종만 남아 노출된다. 23종 밖 종목이 남은 106(딥스·핸드스탠드 푸시업)으로 같은 정책을 검증한다
+    String mixed = "00000000-0000-0000-0000-000000000106";
     mvc.perform(get("/api/v1/routine-templates/" + mixed).header("Authorization", bearer(USER)))
         .andExpect(status().isNotFound());
     create("{\"templateId\":\"" + mixed + "\"}").andExpect(status().isBadRequest());
     jdbc.update(
         "UPDATE routine.exercise SET assessment_status = 'READY' WHERE id = 'knee-push-up'");
+    jdbc.update(
+        "UPDATE routine.exercise SET assessment_status = 'READY' WHERE id IN ('dips', 'handstand-push-up')");
     entityManager.clear();
     mvc.perform(get("/api/v1/exercises/knee-push-up")).andExpect(status().isOk());
     mvc.perform(get("/api/v1/routine-templates/" + mixed).header("Authorization", bearer(USER)))
@@ -187,17 +190,19 @@ class RoutineApiTests {
     mvc.perform(get("/api/v1/exercises/glute-bridge"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.assessmentStatus").value("READY"));
+    // V14: 24개 중 23종만으로 목적을 유지할 수 없는 106·108·109를 제외한 21개 노출 (V12 기준 11개)
     mvc.perform(get("/api/v1/routine-templates"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$", hasSize(11)))
+        .andExpect(jsonPath("$", hasSize(21)))
         .andExpect(jsonPath("$[0].category").value("FULL_BODY"));
     for (String category :
         new String[] {"FULL_BODY", "LOWER_BODY", "UPPER_BODY", "BACK", "CORE", "CARDIO"}) {
       int count =
           switch (category) {
-            case "FULL_BODY", "CORE" -> 3;
-            case "LOWER_BODY" -> 4;
-            case "CARDIO" -> 1;
+            case "FULL_BODY", "CARDIO" -> 3;
+            case "LOWER_BODY", "CORE" -> 6;
+            case "UPPER_BODY" -> 2;
+            case "BACK" -> 1;
             default -> 0;
           };
       mvc.perform(get("/api/v1/routine-templates").param("category", category))
@@ -207,9 +212,10 @@ class RoutineApiTests {
       for (String level : new String[] {"BEGINNER", "INTERMEDIATE", "ADVANCED"}) {
         int expected =
             switch (category) {
-              case "FULL_BODY", "CORE" -> 1;
-              case "LOWER_BODY" -> level.equals("BEGINNER") ? 2 : 1;
-              case "CARDIO" -> level.equals("INTERMEDIATE") ? 1 : 0;
+              case "FULL_BODY", "CARDIO" -> 1;
+              case "LOWER_BODY", "CORE" -> 2;
+              case "UPPER_BODY" -> level.equals("ADVANCED") ? 0 : 1;
+              case "BACK" -> level.equals("BEGINNER") ? 1 : 0;
               default -> 0;
             };
         mvc.perform(
@@ -222,7 +228,7 @@ class RoutineApiTests {
       }
     }
     mvc.perform(get("/api/v1/routine-templates").param("difficulty", "BEGINNER"))
-        .andExpect(jsonPath("$", hasSize(4)));
+        .andExpect(jsonPath("$", hasSize(8)));
     mvc.perform(get("/api/v1/routine-templates").param("category", "UNKNOWN"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
@@ -694,7 +700,7 @@ class RoutineApiTests {
             jdbc.queryForObject(
                 "SELECT count(*) FROM routine.flyway_schema_history WHERE success AND version IS NOT NULL",
                 Integer.class))
-        .isEqualTo(12);
+        .isEqualTo(14);
   }
 
   private ResultActions create(String body) throws Exception {

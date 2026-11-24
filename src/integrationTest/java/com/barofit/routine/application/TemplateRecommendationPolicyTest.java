@@ -49,8 +49,12 @@ class TemplateRecommendationPolicyTest {
     assertThat(result.recommendations()).hasSize(3);
     assertThat(result.recommendations().stream().map(r -> r.template().category()).toList())
         .doesNotHaveDuplicates();
-    assertThat(result.recommendations().getFirst().template().category().name())
-        .isEqualTo("FULL_BODY");
+    // ENDURANCE 우선순위(CARDIO → FULL_BODY → LOWER_BODY)를 그대로 따른다.
+    // V14 전에는 초급 심폐(113)가 23종 밖 종목으로 숨겨져 FULL_BODY가 첫 번째였다
+    assertThat(result.recommendations().stream().map(r -> r.template().category().name()))
+        .containsExactly("CARDIO", "FULL_BODY", "LOWER_BODY");
+    assertThat(result.recommendations())
+        .allMatch(r -> r.template().difficulty().name().equals("BEGINNER"));
     assertThat(result.recommendations())
         .allMatch(TemplateRecommendationService.Recommendation::assessmentReady);
   }
@@ -93,7 +97,7 @@ class TemplateRecommendationPolicyTest {
             .toList();
     assertThat(excluded).isNotEmpty();
     assertThat(service.templates(null, null))
-        .hasSize(11)
+        .hasSize(21)
         .extracting(t -> t.id())
         .containsAll(excluded.stream().map(t -> t.getId()).toList());
     for (var template : excluded) {
