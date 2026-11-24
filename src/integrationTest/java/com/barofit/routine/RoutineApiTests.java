@@ -33,6 +33,7 @@ class RoutineApiTests {
   private static final String CREATE = "{\"templateId\":\"" + TEMPLATE + "\"}";
   @Autowired MockMvc mvc;
   @Autowired JdbcTemplate jdbc;
+  @Autowired jakarta.persistence.EntityManager entityManager;
 
   @BeforeEach
   void cleanup() {
@@ -66,12 +67,118 @@ class RoutineApiTests {
   }
 
   @Test
+  void everyCatalogExerciseHasDistinctDescriptionAndPrecautions() throws Exception {
+    var guides =
+        jdbc.queryForList(
+            "SELECT id, name, description, precautions, preparation, instructions, intro_tts_text FROM routine.exercise");
+    assertThat(guides).hasSize(47);
+    assertThat(guides.stream().map(row -> (String) row.get("description")).toList())
+        .doesNotHaveDuplicates();
+    assertThat(guides.stream().map(row -> (String) row.get("precautions")).toList())
+        .doesNotHaveDuplicates();
+    for (var row : guides) {
+      assertThat((String) row.get("description")).isNotEqualTo(row.get("name") + " 운동입니다.");
+      assertThat((String) row.get("precautions"))
+          .isNotEqualTo("통증이 느껴지거나 균형이 불안정하면 중단하세요. 필요한 지지대가 있다면 먼저 안전하게 고정하세요.");
+      for (String field :
+          new String[] {
+            "description", "precautions", "preparation", "instructions", "intro_tts_text"
+          }) {
+        assertThat((String) row.get(field)).as(row.get("id") + " " + field).isNotBlank();
+      }
+    }
+    mvc.perform(get("/api/v1/exercises/jump-squat"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.precautions", containsString("착지")))
+        .andExpect(jsonPath("$.description", containsString("점프 운동")));
+    mvc.perform(get("/api/v1/exercises/handstand-push-up")).andExpect(status().isNotFound());
+  }
+
+  @Test
+  @org.springframework.transaction.annotation.Transactional
+  void unsupportedExercisesAreRetainedButHiddenAndReadyRestoresVisibility() throws Exception {
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM routine.exercise", Integer.class))
+        .isEqualTo(47);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM routine.exercise WHERE assessment_status = 'READY'",
+                Integer.class))
+        .isEqualTo(23);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM routine.exercise WHERE assessment_status = 'PLANNED'",
+                Integer.class))
+        .isEqualTo(24);
+    var catalog = mvc.perform(get("/api/v1/exercises")).andExpect(status().isOk()).andReturn();
+    java.util.List<String> visibleIds =
+        JsonPath.read(catalog.getResponse().getContentAsString(), "$[*].id");
+    assertThat(visibleIds)
+        .containsExactlyInAnyOrder(
+            "push-up",
+            "plank",
+            "squat",
+            "bird-dog",
+            "jumping-jack",
+            "lunge",
+            "leg-raise",
+            "side-lying-leg-raise",
+            "glute-bridge",
+            "dead-bug",
+            "superman",
+            "pike-push-up",
+            "standing-calf-raise",
+            "incline-push-up",
+            "bulgarian-split-squat",
+            "split-squat",
+            "jump-squat",
+            "mountain-climber",
+            "reverse-crunch",
+            "side-plank",
+            "flutter-kick",
+            "burpee",
+            "sit-up");
+    mvc.perform(get("/api/v1/exercises/knee-push-up")).andExpect(status().isNotFound());
+    String mixed = "00000000-0000-0000-0000-000000000104";
+    mvc.perform(get("/api/v1/routine-templates/" + mixed).header("Authorization", bearer(USER)))
+        .andExpect(status().isNotFound());
+    create("{\"templateId\":\"" + mixed + "\"}").andExpect(status().isBadRequest());
+    jdbc.update(
+        "UPDATE routine.exercise SET assessment_status = 'READY' WHERE id = 'knee-push-up'");
+    entityManager.clear();
+    mvc.perform(get("/api/v1/exercises/knee-push-up")).andExpect(status().isOk());
+    mvc.perform(get("/api/v1/routine-templates/" + mixed).header("Authorization", bearer(USER)))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  @org.springframework.transaction.annotation.Transactional
+  void legacyUserRoutineWithUnsupportedExerciseIsHiddenWithoutDeletingData() throws Exception {
+    String location = createRoutine();
+    String item = itemId(location, 2);
+    jdbc.update(
+        "UPDATE routine.routine_exercise SET exercise_id = 'hollow-hold' WHERE id = ?",
+        UUID.fromString(item));
+    // JDBC 변경 이후 서비스가 최신 값을 읽도록 영속성 컨텍스트를 비운다.
+    entityManager.clear();
+    ownGet(location).andExpect(status().isNotFound());
+    mvc.perform(get("/api/v1/routines").header("Authorization", bearer(USER)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(0));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM routine.routine_exercise WHERE id = ?",
+                Integer.class,
+                UUID.fromString(item)))
+        .isEqualTo(1);
+  }
+
+  @Test
   void expandedCatalogAndTemplatesExposeCategoryGuidesAndGoals() throws Exception {
     mvc.perform(get("/api/v1/exercises"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$", hasSize(47)))
+        .andExpect(jsonPath("$", hasSize(23)))
         .andExpect(
-            jsonPath("$[*].id", hasItems("push-up", "squat", "plank", "bird-dog", "tuck-jump")));
+            jsonPath("$[*].id", hasItems("push-up", "squat", "plank", "bird-dog", "jump-squat")));
     mvc.perform(get("/api/v1/exercises/plank"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.measurementType").value("DURATION"))
@@ -82,27 +189,40 @@ class RoutineApiTests {
         .andExpect(jsonPath("$.assessmentStatus").value("READY"));
     mvc.perform(get("/api/v1/routine-templates"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$", hasSize(24)))
+        .andExpect(jsonPath("$", hasSize(11)))
         .andExpect(jsonPath("$[0].category").value("FULL_BODY"));
     for (String category :
         new String[] {"FULL_BODY", "LOWER_BODY", "UPPER_BODY", "BACK", "CORE", "CARDIO"}) {
-      int count = category.equals("LOWER_BODY") || category.equals("CORE") ? 6 : 3;
+      int count =
+          switch (category) {
+            case "FULL_BODY", "CORE" -> 3;
+            case "LOWER_BODY" -> 4;
+            case "CARDIO" -> 1;
+            default -> 0;
+          };
       mvc.perform(get("/api/v1/routine-templates").param("category", category))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$", hasSize(count)))
           .andExpect(jsonPath("$[*].category", everyItem(is(category))));
       for (String level : new String[] {"BEGINNER", "INTERMEDIATE", "ADVANCED"}) {
+        int expected =
+            switch (category) {
+              case "FULL_BODY", "CORE" -> 1;
+              case "LOWER_BODY" -> level.equals("BEGINNER") ? 2 : 1;
+              case "CARDIO" -> level.equals("INTERMEDIATE") ? 1 : 0;
+              default -> 0;
+            };
         mvc.perform(
                 get("/api/v1/routine-templates")
                     .param("category", category)
                     .param("difficulty", level))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$", hasSize(count / 3)))
-            .andExpect(jsonPath("$[0].difficulty").value(level));
+            .andExpect(jsonPath("$", hasSize(expected)))
+            .andExpect(jsonPath("$[*].difficulty", everyItem(is(level))));
       }
     }
     mvc.perform(get("/api/v1/routine-templates").param("difficulty", "BEGINNER"))
-        .andExpect(jsonPath("$", hasSize(8)));
+        .andExpect(jsonPath("$", hasSize(4)));
     mvc.perform(get("/api/v1/routine-templates").param("category", "UNKNOWN"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
@@ -207,16 +327,16 @@ class RoutineApiTests {
             get(location + "/exercises/" + item + "/replacements")
                 .header("Authorization", bearer(USER)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[*].id", hasItem("forward-lunge")))
+        .andExpect(jsonPath("$[*].id", hasItem("split-squat")))
         .andExpect(jsonPath("$[*].id", not(hasItem("push-up"))));
     mvc.perform(
             put(location + "/exercises/" + item + "/replacement")
                 .header("Authorization", bearer(USER))
                 .contentType(APPLICATION_JSON)
-                .content("{\"exerciseId\":\"forward-lunge\"}"))
+                .content("{\"exerciseId\":\"split-squat\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.exercises[1].id").value(item))
-        .andExpect(jsonPath("$.exercises[1].exerciseId").value("forward-lunge"))
+        .andExpect(jsonPath("$.exercises[1].exerciseId").value("split-squat"))
         .andExpect(jsonPath("$.exercises[1].sets[*].targetReps", everyItem(is(15))))
         .andExpect(jsonPath("$.exercises[1].sets[*].restSeconds", everyItem(is(90))));
     mvc.perform(
@@ -574,7 +694,7 @@ class RoutineApiTests {
             jdbc.queryForObject(
                 "SELECT count(*) FROM routine.flyway_schema_history WHERE success AND version IS NOT NULL",
                 Integer.class))
-        .isEqualTo(8);
+        .isEqualTo(11);
   }
 
   private ResultActions create(String body) throws Exception {

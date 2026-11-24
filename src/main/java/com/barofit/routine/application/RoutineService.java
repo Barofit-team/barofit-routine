@@ -34,12 +34,15 @@ public class RoutineService {
   }
 
   public Detail detail(UUID userId, UUID id) {
-    return Detail.from(owned(userId, id));
+    Routine routine = owned(userId, id);
+    if (!CatalogVisibility.available(routine)) throw RoutineException.notFound();
+    return Detail.from(routine);
   }
 
   public Detail template(UUID id) {
     return routines
         .findByIdAndType(id, RoutineType.TEMPLATE)
+        .filter(CatalogVisibility::available)
         .map(Detail::from)
         .orElseThrow(() -> new RoutineException(RoutineErrorCode.TEMPLATE_NOT_FOUND));
   }
@@ -51,6 +54,7 @@ public class RoutineService {
             : routines.findByTypeAndDifficultyOrderByCreatedAtAscIdAsc(
                 RoutineType.TEMPLATE, difficulty);
     return templates.stream()
+        .filter(CatalogVisibility::available)
         .filter(t -> category == null || t.getCategory() == category)
         .map(Detail::from)
         .toList();
@@ -75,7 +79,7 @@ public class RoutineService {
     }
     Routine routine = new Routine(userId, template);
     for (RoutineExercise source : template.getExercises()) {
-      if (!source.getExercise().isActive() || source.getSets().isEmpty()) {
+      if (!CatalogVisibility.available(source.getExercise()) || source.getSets().isEmpty()) {
         throw RoutineException.invalid("사용할 수 없는 종목이 포함된 템플릿입니다.");
       }
       RoutineExercise item =
@@ -108,6 +112,7 @@ public class RoutineService {
   @Transactional
   public Detail update(UUID userId, UUID id, Update request) {
     Routine routine = owned(userId, id);
+    if (!CatalogVisibility.available(routine)) throw RoutineException.notFound();
     Map<UUID, RoutineExercise> items = new HashMap<>();
     routine.getExercises().forEach(item -> items.put(item.getId(), item));
     Set<UUID> seen = new HashSet<>();
@@ -136,6 +141,7 @@ public class RoutineService {
   public List<ExerciseSummary> replacementCandidates(
       UUID userId, UUID routineId, UUID routineExerciseId) {
     Routine routine = owned(userId, routineId);
+    if (!CatalogVisibility.available(routine)) throw RoutineException.notFound();
     RoutineExercise current = findExercise(routine, routineExerciseId);
     Set<String> used = new HashSet<>();
     routine.getExercises().forEach(item -> used.add(item.getExercise().getId()));
@@ -150,6 +156,7 @@ public class RoutineService {
   public Detail replaceExercise(
       UUID userId, UUID routineId, UUID routineExerciseId, String exerciseId) {
     Routine routine = owned(userId, routineId);
+    if (!CatalogVisibility.available(routine)) throw RoutineException.notFound();
     RoutineExercise current = findExercise(routine, routineExerciseId);
     Exercise replacement =
         exercises
