@@ -5,14 +5,14 @@ import com.barofit.routine.domain.Exercise;
 import com.barofit.routine.domain.Routine;
 
 /** AI 지원 여부에 따른 사용자 노출 정책. 불편 부위 추천 정책과는 별개다. */
-final class CatalogVisibility {
+public final class CatalogVisibility {
   private CatalogVisibility() {}
 
-  static boolean available(Exercise exercise) {
+  public static boolean available(Exercise exercise) {
     return exercise.isActive() && exercise.getAssessmentStatus() == AssessmentStatus.READY;
   }
 
-  static boolean available(Routine routine) {
+  public static boolean available(Routine routine) {
     return !routine.getExercises().isEmpty()
         && routine.getExercises().stream()
             .allMatch(item -> available(item.getExercise()) && !item.getSets().isEmpty());
