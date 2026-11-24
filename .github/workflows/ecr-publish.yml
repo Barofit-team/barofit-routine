@@ -2,13 +2,17 @@ name: BaroFit ECR Build and Publish
 
 on:
   pull_request:
-    branches: [dev]
+    branches:
+      - dev
   push:
-    branches: [dev, main]
+    branches:
+      - dev
+      - main
   workflow_dispatch:
 
 permissions:
   contents: read
+  packages: read
   id-token: write
 
 jobs:
@@ -19,12 +23,6 @@ jobs:
       - name: Checkout service
         uses: actions/checkout@v4
 
-      - name: Checkout common module
-        uses: actions/checkout@v4
-        with:
-          repository: Barofit-team/barofit-common
-          path: barofit-common
-
       - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
@@ -34,53 +32,46 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Publish common module locally
-        working-directory: barofit-common
-        run: ./gradlew publishToMavenLocal --no-daemon
+      - name: Build application JAR
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./gradlew bootJar --no-daemon --refresh-dependencies
 
-      - name: Prepare Docker Maven dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p .m2-cache/com
-          cp -a "$HOME/.m2/repository/com/barofit" .m2-cache/com/
+      - name: Verify application JAR
+        run: test -f build/libs/app.jar
 
-      # main이 아닌 모든 트리거(dev PR/push)에서는 여기까지만 돈다 — 이미지가 실제로
-      # 빌드되는지(Dockerfile 깨짐 여부)를 push 전에 미리 검증하는 용도.
       - name: Build Docker image
-        shell: bash
         run: |
           set -euo pipefail
           docker build --platform linux/amd64 \
+            --progress=plain \
             -t barofit-routine:ci .
 
-      # 아래부터는 main에 실제로 push됐을 때만 실행된다(자동 배포 승인 완료,
-      # barofit-infra#33). OIDC 신뢰 정책(terraform/github-oidc)도 main만 허용한다.
       - name: Configure AWS OIDC credentials
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ECR_ROLE_ARN }}
           aws-region: ap-northeast-2
 
       - name: Login to Amazon ECR
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Push Docker image
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         id: push
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        shell: bash
         run: |
           set -euo pipefail
 
           EXPECTED="373514675861.dkr.ecr.ap-northeast-2.amazonaws.com"
 
           if [ "$ECR_REGISTRY" != "$EXPECTED" ]; then
-            echo "Unexpected ECR registry."
+            echo "Unexpected ECR registry"
             exit 1
           fi
 
@@ -94,27 +85,28 @@ jobs:
           echo "Published: $IMAGE"
 
       - name: Bump image tag in barofit-infra
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.REPO_DISPATCH_TOKEN }}
           TAG: ${{ steps.push.outputs.tag }}
-        shell: bash
         run: |
           set -euo pipefail
 
           git clone --depth 1 --branch main \
             "https://x-access-token:${GH_TOKEN}@github.com/Barofit-team/barofit-infra.git" infra-repo
+
           cd infra-repo
 
           yq -i '.routine.image.tag = strenv(TAG)' infra/values-ecr-prod.yaml
 
           if git diff --quiet; then
-            echo "Tag unchanged, nothing to commit"
+            echo "Tag unchanged"
             exit 0
           fi
 
           git config user.name "barofit-ci"
           git config user.email "ci@barofit.local"
+
           git add infra/values-ecr-prod.yaml
-          git commit -m "chore(cd): bump routine image tag to ${TAG}"
+          git commit -m "chore(cd): bump report image tag to ${TAG}"
           git push origin main

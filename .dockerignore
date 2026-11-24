@@ -15,3 +15,6 @@ keys
 *.p12
 *.jks
 *.keystore
+!build/
+!build/libs/
+!build/libs/app.jar
