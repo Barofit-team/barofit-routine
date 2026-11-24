@@ -98,6 +98,25 @@ class WorkoutPlanServiceTest {
   }
 
   @Test
+  void unsupportedRoutineIsHiddenFromExistingPlansAndCannotBeAssigned() {
+    Routine routine = routineWithOneExercise(userId);
+    when(routine.getExercises().getFirst().getExercise().getAssessmentStatus())
+        .thenReturn(AssessmentStatus.PLANNED);
+    LocalDate date = LocalDate.of(2026, 3, 5);
+    WorkoutPlan plan = planFor(userId, date, routine);
+    when(plans.findByOwnerUserIdAndPlanDate(userId, date)).thenReturn(Optional.of(plan));
+    when(plans.findByOwnerUserIdAndPlanDateBetweenOrderByPlanDateAsc(
+            userId, date.withDayOfMonth(1), date.withDayOfMonth(31)))
+        .thenReturn(List.of(plan));
+    when(routines.findById(routine.getId())).thenReturn(Optional.of(routine));
+    assertThat(service(UNREACHABLE).date(userId, date, "token").routine()).isNull();
+    assertThat(service(UNREACHABLE).month(userId, 2026, 3)).isEmpty();
+    assertThatThrownBy(() -> service(UNREACHABLE).assign(userId, date, routine.getId(), "token"))
+        .isInstanceOf(RoutineException.class);
+    verify(plans, never()).saveAndFlush(any());
+  }
+
+  @Test
   void month_mapsPlansWithinRange() {
     Routine routine = routineWithOneExercise(userId);
     WorkoutPlan plan = planFor(userId, LocalDate.of(2026, 3, 5), routine);

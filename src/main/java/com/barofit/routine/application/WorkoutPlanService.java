@@ -71,6 +71,7 @@ public class WorkoutPlanService {
         .findByOwnerUserIdAndPlanDateBetweenOrderByPlanDateAsc(
             userId, period.atDay(1), period.atEndOfMonth())
         .stream()
+        .filter(plan -> CatalogVisibility.available(plan.getRoutine()))
         .map(plan ->
             new MonthlyPlan(
                 plan.getPlanDate(),
@@ -89,7 +90,8 @@ public class WorkoutPlanService {
             .orElseThrow(() -> new RoutineException(RoutineErrorCode.ROUTINE_NOT_FOUND));
     if (routine.getExercises().isEmpty()
         || routine.getExercises().stream()
-            .anyMatch(e -> !e.getExercise().isActive() || e.getSets().isEmpty())) {
+            .anyMatch(
+                e -> !CatalogVisibility.available(e.getExercise()) || e.getSets().isEmpty())) {
       throw new RoutineException(RoutineErrorCode.INVALID_PLAN);
     }
     Instant now = clock.instant();
@@ -148,7 +150,8 @@ public class WorkoutPlanService {
   }
 
   private Day day(LocalDate date, WorkoutPlan plan, BigDecimal weightKg) {
-    if (plan == null) return new Day(date, null, null, List.of(), null, null);
+    if (plan == null || !CatalogVisibility.available(plan.getRoutine()))
+      return new Day(date, null, null, List.of(), null, null);
     Routine routine = plan.getRoutine();
     List<Step> steps = new ArrayList<>();
     Detail detail = Detail.from(routine);

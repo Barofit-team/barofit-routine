@@ -2,6 +2,8 @@ package com.barofit.routine.domain;
 
 import jakarta.persistence.*;
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -55,6 +57,15 @@ public class Exercise {
 
   @Column(nullable = false)
   private boolean active;
+
+  @ElementCollection
+  @CollectionTable(
+      name = "exercise_discomfort_area",
+      schema = "routine",
+      joinColumns = @JoinColumn(name = "exercise_id"))
+  @Column(name = "area", nullable = false, length = 20)
+  @org.hibernate.annotations.BatchSize(size = 50)
+  private Set<String> discomfortAreas = new HashSet<>();
 
   @Column(nullable = false)
   private Instant createdAt;
