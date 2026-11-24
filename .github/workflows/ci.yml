@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   build-and-test:
-    uses: Barofit-team/barofit-common/.github/workflows/reusable-ci.yml@chore/central-reusable-ci
+    uses: Barofit-team/barofit-common/.github/workflows/reusable-ci.yml@0e7ea3e99ec8fa7da37255446bd85b66ce843855
     permissions:
       contents: read
       packages: read
