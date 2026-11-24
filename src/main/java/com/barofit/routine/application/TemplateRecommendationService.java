@@ -63,9 +63,6 @@ public class TemplateRecommendationService {
   }
 
   static Result select(Profile profile, List<Routine> templates) {
-    if (profile.discomfortAreas.contains("BACK")) {
-      return new Result(List.of(), "등·허리 불편 정보만으로 안전한 동작을 판단할 수 없습니다. 운동 가능 범위를 먼저 확인해 주세요.");
-    }
     Difficulty target =
         switch (profile.experienceLevel) {
           case "NOVICE", "BEGINNER" -> Difficulty.BEGINNER;
@@ -84,7 +81,7 @@ public class TemplateRecommendationService {
                   RoutineCategory.CORE,
                   RoutineCategory.UPPER_BODY,
                   RoutineCategory.BACK);
-          case "STRENGTH" ->
+          case "STRENGTH", "HABIT" ->
               List.of(
                   RoutineCategory.FULL_BODY,
                   RoutineCategory.LOWER_BODY,
@@ -102,23 +99,12 @@ public class TemplateRecommendationService {
                   RoutineCategory.CARDIO);
           default -> throw new RoutineException(RoutineErrorCode.PROFILE_UNAVAILABLE);
         };
-    boolean upper =
-        profile.discomfortAreas.contains("NECK_SHOULDER")
-            || profile.discomfortAreas.contains("ARM_WRIST");
-    boolean lower = profile.discomfortAreas.contains("LEG_ANKLE");
     List<Routine> eligible =
         templates.stream()
-            .filter(t -> t.getCategory() != null && !t.getExercises().isEmpty())
-            .filter(t ->
-                t.getExercises().stream()
-                    .allMatch(e -> e.getExercise().isActive() && !e.getSets().isEmpty()))
+            .filter(t -> t.getCategory() != null)
+            .filter(CatalogVisibility::available)
             .filter(t -> t.getDifficulty().ordinal() <= target.ordinal())
-            .filter(t -> !upper || t.getCategory() == RoutineCategory.LOWER_BODY)
-            .filter(t ->
-                !lower
-                    || Set.of(
-                            RoutineCategory.UPPER_BODY, RoutineCategory.BACK, RoutineCategory.CORE)
-                        .contains(t.getCategory()))
+            .filter(t -> DiscomfortRecommendationPolicy.eligible(t, profile.discomfortAreas))
             .sorted(
                 Comparator.<Routine>comparingInt(
                         t -> target.ordinal() - t.getDifficulty().ordinal())

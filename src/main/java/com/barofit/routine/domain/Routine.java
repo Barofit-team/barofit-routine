@@ -69,6 +69,19 @@ public class Routine {
     return Collections.unmodifiableList(exercises);
   }
 
+  public void manage(
+      String name, String description, Difficulty difficulty, RoutineCategory category) {
+    this.name = name;
+    this.description = description;
+    this.difficulty = difficulty;
+    this.category = category;
+    touch();
+  }
+
+  public void clearExercises() {
+    exercises.clear();
+  }
+
   public void touch() {
     this.updatedAt = Instant.now();
   }

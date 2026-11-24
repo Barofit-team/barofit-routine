@@ -2,6 +2,8 @@ package com.barofit.routine.domain;
 
 import jakarta.persistence.*;
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -12,6 +14,8 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Exercise {
+  @Version private long version;
+
   @Id
   @Column(length = 50)
   private String id;
@@ -56,9 +60,41 @@ public class Exercise {
   @Column(nullable = false)
   private boolean active;
 
+  @ElementCollection
+  @CollectionTable(
+      name = "exercise_discomfort_area",
+      schema = "routine",
+      joinColumns = @JoinColumn(name = "exercise_id"))
+  @Column(name = "area", nullable = false, length = 20)
+  @org.hibernate.annotations.BatchSize(size = 50)
+  private Set<String> discomfortAreas = new HashSet<>();
+
   @Column(nullable = false)
   private Instant createdAt;
 
   @Column(nullable = false)
   private Instant updatedAt;
+
+  public void manage(
+      String name,
+      String description,
+      String preparation,
+      String instructions,
+      String precautions,
+      String introTtsText,
+      AssessmentStatus assessmentStatus,
+      boolean active,
+      Set<String> areas) {
+    this.name = name;
+    this.description = description;
+    this.preparation = preparation;
+    this.instructions = instructions;
+    this.precautions = precautions;
+    this.introTtsText = introTtsText;
+    this.assessmentStatus = assessmentStatus;
+    this.active = active;
+    this.discomfortAreas.clear();
+    this.discomfortAreas.addAll(areas);
+    this.updatedAt = Instant.now();
+  }
 }
