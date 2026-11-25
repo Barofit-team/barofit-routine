@@ -9,15 +9,18 @@ on:
 
 permissions:
   contents: read
+  packages: read
   id-token: write
 
 jobs:
   build-and-publish:
-    uses: Barofit-team/barofit-common/.github/workflows/reusable-cd.yml@c3dbb829e20f0267c60a0634439369620c91827b
+    uses: Barofit-team/barofit-common/.github/workflows/reusable-cd.yml@e78e24d88876bc1f833b26dc2aa096a6bf5afd67
     with:
       service: routine
+      use_packages: true
     permissions:
       contents: read
+      packages: read
       id-token: write
     secrets:
       REPO_DISPATCH_TOKEN: ${{ secrets.REPO_DISPATCH_TOKEN }}
