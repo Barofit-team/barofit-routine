@@ -25,6 +25,8 @@ class RoutineExerciseContractApiTest {
   private static final String LOWER_INTERMEDIATE = "00000000-0000-0000-0000-000000000102";
   private static final String BACK_BEGINNER = "00000000-0000-0000-0000-000000000107";
   private static final String CARDIO_BEGINNER = "00000000-0000-0000-0000-000000000113";
+  private static final String CORE_INTERMEDIATE = "00000000-0000-0000-0000-000000000111";
+  private static final String CORE_ADVANCED = "00000000-0000-0000-0000-000000000112";
   @Autowired MockMvc mvc;
   @Autowired JdbcTemplate jdbc;
 
@@ -42,13 +44,18 @@ class RoutineExerciseContractApiTest {
         .andExpect(jsonPath("$.assessmentStatus").value("READY"));
     mvc.perform(get("/api/v1/exercises/glute-bridge"))
         .andExpect(jsonPath("$.measurementType").value("REPS"));
+    // V15: 플러터킥도 AI 분석기(flutter_kicks, count)와 같은 REPS
+    mvc.perform(get("/api/v1/exercises/flutter-kick"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.measurementType").value("REPS"))
+        .andExpect(jsonPath("$.assessmentStatus").value("READY"));
     mvc.perform(get("/api/v1/exercises"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$", hasSize(23)))
         .andExpect(
             jsonPath(
                 "$[?(@.measurementType == 'DURATION')].id",
-                containsInAnyOrder("plank", "side-plank", "flutter-kick")));
+                containsInAnyOrder("plank", "side-plank")));
   }
 
   @Test
@@ -100,6 +107,38 @@ class RoutineExerciseContractApiTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.routine.id").value(routineId))
         .andExpect(jsonPath("$.steps[*].type", hasItem("EXERCISE")));
+  }
+
+  @Test
+  void flutterKickTemplatesCopyAndPlanWithRepetitionTargets() throws Exception {
+    mvc.perform(templateDetail(CORE_INTERMEDIATE))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.exercises[3].exerciseId").value("flutter-kick"))
+        .andExpect(jsonPath("$.exercises[3].sets[*].targetReps", everyItem(is(10))))
+        .andExpect(jsonPath("$.exercises[3].sets[0].targetDurationSeconds").isEmpty());
+    String location =
+        mvc.perform(
+                post("/api/v1/routines")
+                    .header("Authorization", bearer())
+                    .contentType(APPLICATION_JSON)
+                    .content("{\"templateId\":\"" + CORE_ADVANCED + "\"}"))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getHeader("Location");
+    mvc.perform(get(location).header("Authorization", bearer()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.exercises[2].exerciseId").value("flutter-kick"))
+        .andExpect(jsonPath("$.exercises[2].sets[*].targetReps", everyItem(is(12))))
+        .andExpect(jsonPath("$.exercises[2].sets[0].targetDurationSeconds").isEmpty());
+    String routineId = location.substring(location.lastIndexOf('/') + 1);
+    mvc.perform(
+            put("/api/v1/workout-plans/2026-12-02")
+                .header("Authorization", bearer())
+                .contentType(APPLICATION_JSON)
+                .content("{\"routineId\":\"" + routineId + "\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.routine.id").value(routineId));
   }
 
   // 템플릿 상세는 기존 계약대로 인증이 필요하다 (목록만 공개)

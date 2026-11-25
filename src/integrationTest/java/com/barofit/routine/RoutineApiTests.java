@@ -700,7 +700,7 @@ class RoutineApiTests {
             jdbc.queryForObject(
                 "SELECT count(*) FROM routine.flyway_schema_history WHERE success AND version IS NOT NULL",
                 Integer.class))
-        .isEqualTo(14);
+        .isEqualTo(15);
   }
 
   private ResultActions create(String body) throws Exception {

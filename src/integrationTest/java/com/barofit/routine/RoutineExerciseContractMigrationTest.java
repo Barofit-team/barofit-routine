@@ -17,9 +17,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * V13(마운틴 클라이머 REPS)·V14(23종 템플릿 정리, 사용자 루틴 호환) 검증.
+ * V13(마운틴 클라이머 REPS)·V14(23종 템플릿 정리, 사용자 루틴 호환)·V15(플러터킥 REPS) 검증.
  *
- * <p>공유 PostgreSQL 컨테이너 안에 테스트 전용 DB를 새로 만들어 빈 DB 설치와 V12 → V14 업그레이드를 각각 실행한다. 운영 DB는 사용하지 않는다.
+ * <p>공유 PostgreSQL 컨테이너 안에 테스트 전용 DB를 새로 만들어 빈 DB 설치와 V12 → 최신, V14 → V15 업그레이드를 각각 실행한다. 운영 DB는
+ * 사용하지 않는다.
  */
 class RoutineExerciseContractMigrationTest {
 
@@ -59,11 +60,14 @@ class RoutineExerciseContractMigrationTest {
               single(c, "SELECT measurement_type FROM routine.exercise WHERE id = 'glute-bridge'"))
           .isEqualTo("REPS");
       assertThat(
+              single(c, "SELECT measurement_type FROM routine.exercise WHERE id = 'flutter-kick'"))
+          .isEqualTo("REPS");
+      assertThat(
               list(
                   c,
                   "SELECT id FROM routine.exercise WHERE measurement_type = 'DURATION'"
                       + " AND assessment_status = 'READY' ORDER BY id"))
-          .containsExactly("flutter-kick", "plank", "side-plank");
+          .containsExactly("plank", "side-plank");
       assertThat(list(c, VISIBLE_TEMPLATES)).hasSize(21);
       assertThat(list(c, HIDDEN_TEMPLATES))
           .containsExactly(
@@ -90,9 +94,105 @@ class RoutineExerciseContractMigrationTest {
       assertThat(exercises(c, "00000000-0000-0000-0000-000000000104"))
           .containsExactly("incline-push-up:10", "push-up:10");
       assertThat(exercises(c, "00000000-0000-0000-0000-000000000111"))
-          .containsExactly("sit-up:10", "reverse-crunch:10", "dead-bug:10", "flutter-kick:30s");
+          .containsExactly("sit-up:10", "reverse-crunch:10", "dead-bug:10", "flutter-kick:10");
+      assertThat(exercises(c, "00000000-0000-0000-0000-000000000112"))
+          .containsExactly("dead-bug:10", "leg-raise:10", "flutter-kick:12");
     }
   }
+
+  @Test
+  void upgradeFromV14ConvertsFlutterKickTargetsByDifficultyAndKeepsEverythingElse()
+      throws SQLException {
+    flyway("14").migrate();
+    String before;
+    String otherBefore;
+    String[] changedIds = {
+      "00000000-0000-0000-0000-000000000111",
+      "00000000-0000-0000-0000-000000000112",
+      user("7"),
+      user("8"),
+      user("9")
+    };
+    List<String> versionsBefore = new ArrayList<>();
+    try (Connection c = connect();
+        Statement st = c.createStatement()) {
+      assertThat(
+              single(c, "SELECT measurement_type FROM routine.exercise WHERE id = 'flutter-kick'"))
+          .isEqualTo("DURATION");
+      st.execute(SEED_FUNCTION);
+      copy(st, "111", "7"); // 중급 템플릿 복사 (V14 교체 결과 그대로 30초)
+      copy(st, "112", "8"); // 고급
+      copy(st, "111", "9"); // 초급으로 바꾸고 사용자가 45초·휴식 75초로 수정
+      copy(st, "001", "a"); // 플러터킥 없는 사용자 루틴
+      st.execute(
+          "UPDATE routine.routine SET difficulty = 'BEGINNER' WHERE id = '" + user("9") + "'");
+      st.execute(
+          "UPDATE routine.routine_set s SET target_duration_seconds = 45, rest_seconds = 75"
+              + " FROM routine.routine_exercise re WHERE s.routine_exercise_id = re.id"
+              + " AND re.routine_id = '"
+              + user("9")
+              + "' AND re.exercise_id = 'flutter-kick'");
+      assertThat(exercises(c, user("9")))
+          .containsExactly("sit-up:10", "reverse-crunch:10", "dead-bug:10", "flutter-kick:45s");
+      before = single(c, FLUTTER_SET_SHAPE);
+      otherBefore = single(c, NON_FLUTTER_SETS);
+      for (String id : changedIds) {
+        versionsBefore.add(version(c, id));
+      }
+    }
+
+    flyway(null).migrate();
+
+    try (Connection c = connect()) {
+      assertThat(
+              single(c, "SELECT measurement_type FROM routine.exercise WHERE id = 'flutter-kick'"))
+          .isEqualTo("REPS");
+      // 루틴 난이도 기준 초급 8 / 중급 10 / 고급 12회, 시간 목표는 지움
+      assertThat(exercises(c, "00000000-0000-0000-0000-000000000111"))
+          .containsExactly("sit-up:10", "reverse-crunch:10", "dead-bug:10", "flutter-kick:10");
+      assertThat(exercises(c, "00000000-0000-0000-0000-000000000112"))
+          .containsExactly("dead-bug:10", "leg-raise:10", "flutter-kick:12");
+      assertThat(exercises(c, user("7")))
+          .containsExactly("sit-up:10", "reverse-crunch:10", "dead-bug:10", "flutter-kick:10");
+      assertThat(exercises(c, user("8")))
+          .containsExactly("dead-bug:10", "leg-raise:10", "flutter-kick:12");
+      assertThat(exercises(c, user("9")))
+          .as("사용자가 정한 45초를 45회로 옮기지 않고 난이도 기본값으로")
+          .containsExactly("sit-up:10", "reverse-crunch:10", "dead-bug:10", "flutter-kick:8");
+      assertThat(
+              single(
+                  c,
+                  "SELECT count(*) FROM routine.routine_set s JOIN routine.routine_exercise re"
+                      + " ON re.id = s.routine_exercise_id WHERE re.exercise_id = 'flutter-kick'"
+                      + " AND (s.target_duration_seconds IS NOT NULL OR s.target_reps IS NULL)"))
+          .as("플러터킥 세트에 시간 목표가 남지 않음")
+          .isEqualTo("0");
+      // 세트 ID·수·순서·휴식·무게는 그대로(사용자 휴식 75초 포함), 다른 종목 세트는 한 행도 바뀌지 않음
+      assertThat(single(c, FLUTTER_SET_SHAPE)).isEqualTo(before);
+      assertThat(single(c, NON_FLUTTER_SETS)).isEqualTo(otherBefore);
+      for (int i = 0; i < changedIds.length; i++) {
+        assertThat(Integer.parseInt(version(c, changedIds[i])))
+            .as("변경된 루틴은 낙관적 잠금 버전 +1 " + changedIds[i])
+            .isEqualTo(Integer.parseInt(versionsBefore.get(i)) + 1);
+      }
+      assertThat(version(c, user("a"))).as("플러터킥 없는 루틴은 그대로").isEqualTo("0");
+      assertIntegrity(c);
+    }
+  }
+
+  /** 플러터킥 세트의 ID·순서·휴식·무게 (목표값 제외) */
+  private static final String FLUTTER_SET_SHAPE =
+      "SELECT string_agg(s.id || ':' || s.set_order || ':' || s.rest_seconds || ':' || s.weight_kg,"
+          + " ',' ORDER BY s.id) FROM routine.routine_set s JOIN routine.routine_exercise re"
+          + " ON re.id = s.routine_exercise_id WHERE re.exercise_id = 'flutter-kick'";
+
+  /** 플러터킥이 아닌 세트 전체 (목표값 포함) */
+  private static final String NON_FLUTTER_SETS =
+      "SELECT md5(string_agg(s.id || ':' || coalesce(s.target_reps::text, '-') || ':'"
+          + " || coalesce(s.target_duration_seconds::text, '-') || ':' || s.rest_seconds || ':'"
+          + " || s.weight_kg, ',' ORDER BY s.id)) FROM routine.routine_set s"
+          + " JOIN routine.routine_exercise re ON re.id = s.routine_exercise_id"
+          + " WHERE re.exercise_id <> 'flutter-kick'";
 
   @Test
   void upgradeFromV12KeepsUserDataAndAppliesOnlySafeReplacements() throws SQLException {
