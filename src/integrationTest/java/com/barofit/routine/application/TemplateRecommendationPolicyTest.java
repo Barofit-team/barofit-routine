@@ -49,8 +49,11 @@ class TemplateRecommendationPolicyTest {
     assertThat(result.recommendations()).hasSize(3);
     assertThat(result.recommendations().stream().map(r -> r.template().category()).toList())
         .doesNotHaveDuplicates();
-    assertThat(result.recommendations().getFirst().template().category().name())
-        .isEqualTo("CARDIO");
+    // ENDURANCE 우선순위(CARDIO → FULL_BODY → LOWER_BODY)를 그대로 따른다.
+    assertThat(result.recommendations().stream().map(r -> r.template().category().name()))
+        .containsExactly("CARDIO", "FULL_BODY", "LOWER_BODY");
+    assertThat(result.recommendations())
+        .allMatch(r -> r.template().difficulty().name().equals("BEGINNER"));
     assertThat(result.recommendations())
         .allMatch(TemplateRecommendationService.Recommendation::assessmentReady);
   }
@@ -93,7 +96,7 @@ class TemplateRecommendationPolicyTest {
             .toList();
     assertThat(excluded).isNotEmpty();
     assertThat(service.templates(null, null))
-        .hasSize(35)
+        .hasSize(45)
         .extracting(t -> t.id())
         .containsAll(excluded.stream().map(t -> t.getId()).toList());
     for (var template : excluded) {
