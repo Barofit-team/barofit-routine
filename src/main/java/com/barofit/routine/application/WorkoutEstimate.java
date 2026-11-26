@@ -13,16 +13,20 @@ public final class WorkoutEstimate {
   public static Result of(Routine routine, BigDecimal weightKg) {
     int work = 0;
     int rest = 0;
-    int totalSets = routine.getExercises().stream().mapToInt(e -> e.getSets().size()).sum();
-    int seenSets = 0;
-    for (RoutineExercise exercise : routine.getExercises()) {
-      for (RoutineSet set : exercise.getSets()) {
-        work +=
+    for (int i = 0; i < routine.getExercises().size(); i++) {
+      var exercise = routine.getExercises().get(i);
+      for (int j = 0; j < exercise.getSets().size(); j++) {
+        var set = exercise.getSets().get(j);
+        int seconds =
             set.getTargetDurationSeconds() != null
                 ? set.getTargetDurationSeconds()
                 : set.getTargetReps() * 3;
-        if (++seenSets < totalSets) rest += set.getRestSeconds();
+        if (set.getTimeLimitSeconds() != null)
+          seconds = Math.min(seconds, set.getTimeLimitSeconds());
+        work += seconds;
+        if (j + 1 < exercise.getSets().size()) rest += set.getRestSeconds();
       }
+      if (i + 1 < routine.getExercises().size()) rest += routine.getInterExerciseRestSeconds();
     }
     // 종목 이동 시간을 종목당 10초로 표시한다.
     int transition = routine.getExercises().size() * 10;

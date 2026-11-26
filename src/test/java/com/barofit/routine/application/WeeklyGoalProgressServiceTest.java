@@ -145,10 +145,21 @@ class WeeklyGoalProgressServiceTest {
             "/api/v1/workout-sessions/weekly-progress",
             "{\"weekStart\":\"2026-03-09\",\"completedDates\":"
                 + "[\"2026-03-09\",\"2026-03-10\",\"2026-03-11\"]}");
+    workoutServer.createContext(
+        "/api/v1/workout-sessions/weekly-streak",
+        exchange -> {
+          byte[] body = "{\"streakWeeks\":3}".getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          try (var out = exchange.getResponseBody()) {
+            out.write(body);
+          }
+        });
     var service = new WeeklyGoalProgressService(baseUrl(identityServer), baseUrl(workoutServer));
 
     var result = service.get(userId, MONDAY, "t");
 
+    assertThat(result.streakWeeks()).isEqualTo(3);
     assertThat(result.weeklyGoal()).isEqualTo(2);
     assertThat(result.completedCount()).isEqualTo(3);
     assertThat(result.goalProgress()).isEqualTo(2);

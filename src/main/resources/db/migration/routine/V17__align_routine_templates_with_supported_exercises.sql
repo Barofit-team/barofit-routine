@@ -82,7 +82,7 @@ FROM (
 WHERE re.id = o.id;
 
 -- 3. 측정 방식·난이도가 달라진 교체의 목표값 (REPS/DURATION 목표를 섞지 않는다)
---    113 제자리 걷기 30초(DURATION) → 마운틴 클라이머 초급 16회(REPS, V13 기준), 115 턱 점프 10회 → 마운틴 클라이머 고급 24회
+--    113 제자리 걷기 30초(DURATION) → 마운틴 클라이머 초급 16회(REPS, V16 기준), 115 턱 점프 10회 → 마운틴 클라이머 고급 24회
 --    103 한쪽 다리 스쿼트 5회 → 런지 10회(V6 반복 종목 기본값, 같은 템플릿의 불가리안 스플릿 스쿼트와 동일)
 UPDATE routine.routine_set s
 SET target_reps = CASE re.routine_id

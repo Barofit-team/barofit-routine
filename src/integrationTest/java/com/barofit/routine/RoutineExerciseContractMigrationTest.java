@@ -17,9 +17,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * V13(마운틴 클라이머 REPS)·V14(23종 템플릿 정리, 사용자 루틴 호환)·V15(플러터킥 REPS) 검증.
+ * V16(마운틴 클라이머 REPS)·V17(23종 템플릿 정리, 사용자 루틴 호환)·V18(플러터킥 REPS) 검증. V13~V15(대표 불편 부위·일일 루틴
+ * 커스터마이징·AI READY 신규 루틴 24개) 이후에 적용된다.
  *
- * <p>공유 PostgreSQL 컨테이너 안에 테스트 전용 DB를 새로 만들어 빈 DB 설치와 V12 → 최신, V14 → V15 업그레이드를 각각 실행한다. 운영 DB는
+ * <p>공유 PostgreSQL 컨테이너 안에 테스트 전용 DB를 새로 만들어 빈 DB 설치와 V12 → 최신, V17 → V18 업그레이드를 각각 실행한다. 운영 DB는
  * 사용하지 않는다.
  */
 class RoutineExerciseContractMigrationTest {
@@ -68,7 +69,20 @@ class RoutineExerciseContractMigrationTest {
                   "SELECT id FROM routine.exercise WHERE measurement_type = 'DURATION'"
                       + " AND assessment_status = 'READY' ORDER BY id"))
           .containsExactly("plank", "side-plank");
-      assertThat(list(c, VISIBLE_TEMPLATES)).hasSize(21);
+      // 기존 24개 중 106·108·109를 제외한 21개 + V15 신규 24개
+      assertThat(list(c, VISIBLE_TEMPLATES)).hasSize(45);
+      assertThat(
+              single(
+                  c,
+                  "SELECT count(*) FROM routine.routine_set s JOIN routine.routine_exercise re"
+                      + " ON re.id = s.routine_exercise_id"
+                      + " WHERE re.exercise_id IN ('mountain-climber', 'flutter-kick')"
+                      + " AND re.routine_id BETWEEN '00000000-0000-0000-0000-000000000201'"
+                      + " AND '00000000-0000-0000-0000-000000000224'"
+                      + " AND (s.target_reps IS NULL OR s.target_duration_seconds IS NOT NULL"
+                      + " OR s.time_limit_seconds IS DISTINCT FROM 60)"))
+          .as("V15 신규 루틴의 마운틴 클라이머·플러터킥도 REPS 목표와 세트 제한 시간 60초")
+          .isEqualTo("0");
       assertThat(list(c, HIDDEN_TEMPLATES))
           .containsExactly(
               "00000000-0000-0000-0000-000000000106",
@@ -101,9 +115,9 @@ class RoutineExerciseContractMigrationTest {
   }
 
   @Test
-  void upgradeFromV14ConvertsFlutterKickTargetsByDifficultyAndKeepsEverythingElse()
+  void upgradeFromV17ConvertsFlutterKickTargetsByDifficultyAndKeepsEverythingElse()
       throws SQLException {
-    flyway("14").migrate();
+    flyway("17").migrate();
     String before;
     String otherBefore;
     String[] changedIds = {
@@ -120,7 +134,7 @@ class RoutineExerciseContractMigrationTest {
               single(c, "SELECT measurement_type FROM routine.exercise WHERE id = 'flutter-kick'"))
           .isEqualTo("DURATION");
       st.execute(SEED_FUNCTION);
-      copy(st, "111", "7"); // 중급 템플릿 복사 (V14 교체 결과 그대로 30초)
+      copy(st, "111", "7"); // 중급 템플릿 복사 (V17 교체 결과 그대로 30초)
       copy(st, "112", "8"); // 고급
       copy(st, "111", "9"); // 초급으로 바꾸고 사용자가 45초·휴식 75초로 수정
       copy(st, "001", "a"); // 플러터킥 없는 사용자 루틴
@@ -328,7 +342,7 @@ class RoutineExerciseContractMigrationTest {
           + " WHERE r.type = 'TEMPLATE' GROUP BY r.id"
           + " HAVING NOT bool_and(e.active AND e.assessment_status = 'READY') ORDER BY r.id";
 
-  // 사용자 루틴만 비교한다. 템플릿은 V14가 의도적으로 종목을 빼고 순서를 다시 매긴다(아래 템플릿 검증 참고)
+  // 사용자 루틴만 비교한다. 템플릿은 V17이 의도적으로 종목을 빼고 순서를 다시 매긴다(아래 템플릿 검증 참고)
   private static final String ROUTINE_EXERCISE_IDS =
       "SELECT re.id::text || ':' || re.exercise_order FROM routine.routine_exercise re"
           + " JOIN routine.routine r ON r.id = re.routine_id WHERE r.type = 'USER'"

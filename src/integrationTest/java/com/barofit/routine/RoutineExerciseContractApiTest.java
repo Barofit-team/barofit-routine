@@ -16,7 +16,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
-/** 23종 측정 계약과 V14 템플릿 정리 후 공개 API 회귀 검증. 응답 구조는 바꾸지 않는다 */
+/** 23종 측정 계약과 V17 템플릿 정리 후 공개 API 회귀 검증. 응답 구조는 바꾸지 않는다 */
 @RoutineIntegrationTest
 @AutoConfigureMockMvc
 @TestPropertySource(properties = "barofit.identity.base-url=http://127.0.0.1:1")
@@ -44,7 +44,7 @@ class RoutineExerciseContractApiTest {
         .andExpect(jsonPath("$.assessmentStatus").value("READY"));
     mvc.perform(get("/api/v1/exercises/glute-bridge"))
         .andExpect(jsonPath("$.measurementType").value("REPS"));
-    // V15: 플러터킥도 AI 분석기(flutter_kicks, count)와 같은 REPS
+    // V18: 플러터킥도 AI 분석기(flutter_kicks, count)와 같은 REPS
     mvc.perform(get("/api/v1/exercises/flutter-kick"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.measurementType").value("REPS"))

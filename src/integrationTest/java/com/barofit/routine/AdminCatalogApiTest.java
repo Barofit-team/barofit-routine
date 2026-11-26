@@ -85,7 +85,7 @@ class AdminCatalogApiTest {
         .andExpect(jsonPath("$.length()").value(47));
     var e =
         service.exercises().stream().filter(x -> x.id().equals("squat")).findFirst().orElseThrow();
-    var input = edit(e, e.version(), Set.of("LEG_ANKLE", "BACK"));
+    var input = edit(e, e.version(), Set.of("LEG_ANKLE"));
     mvc.perform(
             put("/api/v1/admin/routine/exercises/squat")
                 .header("Authorization", admin())
@@ -106,6 +106,29 @@ class AdminCatalogApiTest {
         .andExpect(status().isConflict());
     assertThat(audits.count()).isEqualTo(1);
     mvc.perform(get("/api/v1/exercises/squat")).andExpect(status().isNotFound());
+  }
+
+  @Test
+  void everySeedExerciseHasExactlyOnePrimaryAreaAndMultipleAreasAreRejected() throws Exception {
+    assertThat(service.exercises())
+        .hasSize(47)
+        .allSatisfy(e -> assertThat(e.discomfortAreas()).hasSize(1));
+    var e = service.exercises().getFirst();
+    mvc.perform(
+            put("/api/v1/admin/routine/exercises/" + e.id())
+                .header("Authorization", admin())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    json.writeValueAsString(edit(e, e.version(), Set.of("BACK", "LEG_ANKLE")))))
+        .andExpect(status().isBadRequest());
+    assertThat(audits.count()).isZero();
+    assertThat(
+            service.exercises().stream()
+                .filter(x -> x.id().equals(e.id()))
+                .findFirst()
+                .orElseThrow()
+                .discomfortAreas())
+        .isEqualTo(e.discomfortAreas());
   }
 
   @Test

@@ -48,6 +48,21 @@ public class Routine {
 
   @Version private long version;
 
+  @Column(nullable = false)
+  private int interExerciseRestSeconds = 60;
+
+  @Column(nullable = false)
+  private boolean dateScoped;
+
+  public static Routine copyForDate(UUID owner, Routine source, int rest) {
+    Routine copy = new Routine(owner, source);
+    copy.templateId =
+        source.getType() == RoutineType.TEMPLATE ? source.getId() : source.getTemplateId();
+    copy.interExerciseRestSeconds = rest;
+    copy.dateScoped = true;
+    return copy;
+  }
+
   @OneToMany(mappedBy = "routine", cascade = CascadeType.ALL, orphanRemoval = true)
   @OrderBy("exerciseOrder ASC")
   @org.hibernate.annotations.BatchSize(size = 100)

@@ -138,7 +138,7 @@ class RoutineApiTests {
             "burpee",
             "sit-up");
     mvc.perform(get("/api/v1/exercises/knee-push-up")).andExpect(status().isNotFound());
-    // V14 이후 104(초급 상체 밀기)는 23종만 남아 노출된다. 23종 밖 종목이 남은 106(딥스·핸드스탠드 푸시업)으로 같은 정책을 검증한다
+    // V17 이후 104(초급 상체 밀기)는 23종만 남아 노출된다. 23종 밖 종목이 남은 106(딥스·핸드스탠드 푸시업)으로 같은 정책을 검증한다
     String mixed = "00000000-0000-0000-0000-000000000106";
     mvc.perform(get("/api/v1/routine-templates/" + mixed).header("Authorization", bearer(USER)))
         .andExpect(status().isNotFound());
@@ -190,10 +190,10 @@ class RoutineApiTests {
     mvc.perform(get("/api/v1/exercises/glute-bridge"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.assessmentStatus").value("READY"));
-    // V14: 24개 중 23종만으로 목적을 유지할 수 없는 106·108·109를 제외한 21개 노출 (V12 기준 11개)
+    // V17: 기존 24개 중 23종만으로 목적을 유지할 수 없는 106·108·109를 제외한 21개 + V15 신규 24개 = 45개 노출 (V12 기준 11개)
     mvc.perform(get("/api/v1/routine-templates"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$", hasSize(21)))
+        .andExpect(jsonPath("$", hasSize(45)))
         .andExpect(jsonPath("$[0].category").value("FULL_BODY"));
     for (String category :
         new String[] {"FULL_BODY", "LOWER_BODY", "UPPER_BODY", "BACK", "CORE", "CARDIO"}) {
@@ -207,7 +207,7 @@ class RoutineApiTests {
           };
       mvc.perform(get("/api/v1/routine-templates").param("category", category))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$", hasSize(count)))
+          .andExpect(jsonPath("$", hasSize(count + 4)))
           .andExpect(jsonPath("$[*].category", everyItem(is(category))));
       for (String level : new String[] {"BEGINNER", "INTERMEDIATE", "ADVANCED"}) {
         int expected =
@@ -223,12 +223,12 @@ class RoutineApiTests {
                     .param("category", category)
                     .param("difficulty", level))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$", hasSize(expected)))
+            .andExpect(jsonPath("$", hasSize(expected + (level.equals("BEGINNER") ? 2 : 1))))
             .andExpect(jsonPath("$[*].difficulty", everyItem(is(level))));
       }
     }
     mvc.perform(get("/api/v1/routine-templates").param("difficulty", "BEGINNER"))
-        .andExpect(jsonPath("$", hasSize(8)));
+        .andExpect(jsonPath("$", hasSize(20)));
     mvc.perform(get("/api/v1/routine-templates").param("category", "UNKNOWN"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
@@ -700,7 +700,7 @@ class RoutineApiTests {
             jdbc.queryForObject(
                 "SELECT count(*) FROM routine.flyway_schema_history WHERE success AND version IS NOT NULL",
                 Integer.class))
-        .isEqualTo(15);
+        .isEqualTo(18);
   }
 
   private ResultActions create(String body) throws Exception {

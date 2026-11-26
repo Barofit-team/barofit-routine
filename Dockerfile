@@ -2,9 +2,12 @@ FROM eclipse-temurin:21-jdk AS build
 WORKDIR /workspace
 COPY gradlew settings.gradle build.gradle ./
 COPY gradle ./gradle
-COPY .m2-cache /root/.m2/repository
 COPY src ./src
+ARG GITHUB_ACTOR
 RUN --mount=type=cache,target=/root/.gradle,sharing=locked \
+    --mount=type=secret,id=github_token,required=true \
+    GITHUB_TOKEN="$(cat /run/secrets/github_token)" \
+    GITHUB_ACTOR="$GITHUB_ACTOR" \
     ./gradlew --no-daemon bootJar && \
     cp build/libs/app.jar /workspace/service.jar
 

@@ -39,6 +39,8 @@ public class WorkoutPlan {
   @Column(nullable = false)
   private Instant updatedAt;
 
+  @Version private long version;
+
   public WorkoutPlan(UUID ownerUserId, LocalDate planDate, Routine routine, Instant now) {
     this.ownerUserId = ownerUserId;
     this.planDate = planDate;

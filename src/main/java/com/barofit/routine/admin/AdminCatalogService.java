@@ -66,8 +66,8 @@ public class AdminCatalogService {
 
   @Transactional
   public ExerciseView updateExercise(UUID actor, String id, ExerciseEdit edit) {
-    if (!AREAS.containsAll(edit.discomfortAreas()))
-      throw RoutineException.invalid("지원하지 않는 불편 부위입니다.");
+    if (edit.discomfortAreas().size() != 1 || !AREAS.containsAll(edit.discomfortAreas()))
+      throw RoutineException.invalid("대표 불편 부위를 하나만 선택해 주세요.");
     var e =
         exercises
             .findById(id)

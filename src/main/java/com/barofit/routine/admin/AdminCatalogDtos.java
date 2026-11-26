@@ -35,7 +35,7 @@ public final class AdminCatalogDtos {
       @NotBlank @Size(max = 10000) String introTtsText,
       @NotNull AssessmentStatus assessmentStatus,
       @NotNull Boolean active,
-      @NotEmpty @Size(max = 4) Set<@NotBlank String> discomfortAreas) {}
+      @NotEmpty @Size(min = 1, max = 1) Set<@NotBlank String> discomfortAreas) {}
 
   public record TemplateView(
       Detail detail, long version, boolean visible, List<String> hiddenReasons) {}
