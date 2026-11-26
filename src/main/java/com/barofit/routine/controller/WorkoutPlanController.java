@@ -86,6 +86,18 @@ public class WorkoutPlanController {
     return service.assign(currentUser.userId(), date, request.routineId(), jwt.getTokenValue());
   }
 
+  @PutMapping("/{date}/customization")
+  @Operation(
+      summary = "날짜별 루틴 복사 편집",
+      description =
+          "선택한 날짜에만 새 루틴 복사본을 배정합니다. 원본과 다른 날짜는 보존합니다. 종목 순서·삭제, 세트별 목표·제한 시간·휴식 및 종목 간 휴식을 저장합니다. expectedRoutineId가 현재 배정과 다르면 409입니다.")
+  public WorkoutPlanService.Day customize(
+      @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+      @Valid @RequestBody com.barofit.routine.dto.DailyRoutineCustomization request,
+      @AuthenticationPrincipal Jwt jwt) {
+    return service.customize(currentUser.userId(), date, request, jwt.getTokenValue());
+  }
+
   @DeleteMapping("/{date}")
   @Operation(summary = "날짜의 루틴 배정 제거", description = "빈 날짜도 204를 반환합니다. 이미 시작한 운동 세션의 스냅샷은 유지됩니다.")
   public ResponseEntity<Void> remove(

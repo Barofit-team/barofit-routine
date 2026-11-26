@@ -34,7 +34,8 @@ public class WeeklyGoalProgressService {
       int weeklyGoal,
       int completedCount,
       int goalProgress,
-      List<LocalDate> completedDates) {}
+      List<LocalDate> completedDates,
+      int streakWeeks) {}
 
   public Result get(UUID userId, LocalDate weekStart, String accessToken) {
     if (weekStart.getDayOfWeek() != DayOfWeek.MONDAY)
@@ -78,11 +79,29 @@ public class WeeklyGoalProgressService {
     List<LocalDate> dates = new java.util.ArrayList<>();
     for (JsonNode date : progress.path("completedDates")) dates.add(LocalDate.parse(date.asText()));
     int completed = dates.size();
+    JsonNode streak;
+    try {
+      streak =
+          workout
+              .get()
+              .uri(uri ->
+                  uri.path("/api/v1/workout-sessions/weekly-streak")
+                      .queryParam("weeklyGoal", goal.intValue())
+                      .build())
+              .headers(h -> h.setBearerAuth(accessToken))
+              .retrieve()
+              .body(JsonNode.class);
+    } catch (RestClientException e) {
+      throw new RoutineException(RoutineErrorCode.WORKOUT_UNAVAILABLE);
+    }
+    if (streak == null || !streak.path("streakWeeks").isInt())
+      throw new RoutineException(RoutineErrorCode.WORKOUT_UNAVAILABLE);
     return new Result(
         weekStart,
         goal.intValue(),
         completed,
         Math.min(goal.intValue(), completed),
-        List.copyOf(dates));
+        List.copyOf(dates),
+        streak.path("streakWeeks").intValue());
   }
 }
