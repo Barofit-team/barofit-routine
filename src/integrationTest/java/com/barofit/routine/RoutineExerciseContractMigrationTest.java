@@ -17,11 +17,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * V16(마운틴 클라이머 REPS)·V17(23종 템플릿 정리, 사용자 루틴 호환)·V18(플러터킥 REPS) 검증. V13~V15(대표 불편 부위·일일 루틴
- * 커스터마이징·AI READY 신규 루틴 24개) 이후에 적용된다.
+ * V16~V18 migration 검증 (V13~V15 이후 적용).
  *
- * <p>공유 PostgreSQL 컨테이너 안에 테스트 전용 DB를 새로 만들어 빈 DB 설치와 V12 → 최신, V17 → V18 업그레이드를 각각 실행한다. 운영 DB는
- * 사용하지 않는다.
+ * <p>테스트 전용 DB에서 설치와 업그레이드를 실행한다.
  */
 class RoutineExerciseContractMigrationTest {
 
