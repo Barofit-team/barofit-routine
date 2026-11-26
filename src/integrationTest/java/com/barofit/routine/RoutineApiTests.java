@@ -189,7 +189,7 @@ class RoutineApiTests {
         .andExpect(jsonPath("$.assessmentStatus").value("READY"));
     mvc.perform(get("/api/v1/routine-templates"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$", hasSize(11)))
+        .andExpect(jsonPath("$", hasSize(35)))
         .andExpect(jsonPath("$[0].category").value("FULL_BODY"));
     for (String category :
         new String[] {"FULL_BODY", "LOWER_BODY", "UPPER_BODY", "BACK", "CORE", "CARDIO"}) {
@@ -202,7 +202,7 @@ class RoutineApiTests {
           };
       mvc.perform(get("/api/v1/routine-templates").param("category", category))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$", hasSize(count)))
+          .andExpect(jsonPath("$", hasSize(count + 4)))
           .andExpect(jsonPath("$[*].category", everyItem(is(category))));
       for (String level : new String[] {"BEGINNER", "INTERMEDIATE", "ADVANCED"}) {
         int expected =
@@ -217,12 +217,12 @@ class RoutineApiTests {
                     .param("category", category)
                     .param("difficulty", level))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$", hasSize(expected)))
+            .andExpect(jsonPath("$", hasSize(expected + (level.equals("BEGINNER") ? 2 : 1))))
             .andExpect(jsonPath("$[*].difficulty", everyItem(is(level))));
       }
     }
     mvc.perform(get("/api/v1/routine-templates").param("difficulty", "BEGINNER"))
-        .andExpect(jsonPath("$", hasSize(4)));
+        .andExpect(jsonPath("$", hasSize(16)));
     mvc.perform(get("/api/v1/routine-templates").param("category", "UNKNOWN"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
@@ -694,7 +694,7 @@ class RoutineApiTests {
             jdbc.queryForObject(
                 "SELECT count(*) FROM routine.flyway_schema_history WHERE success AND version IS NOT NULL",
                 Integer.class))
-        .isEqualTo(14);
+        .isEqualTo(15);
   }
 
   private ResultActions create(String body) throws Exception {
