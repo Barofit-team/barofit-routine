@@ -71,7 +71,8 @@ public final class RoutineResponses {
       RoutineCategory category,
       List<ExerciseItem> exercises,
       Instant createdAt,
-      Instant updatedAt) {
+      Instant updatedAt,
+      int interExerciseRestSeconds) {
     public static Detail from(Routine r) {
       return new Detail(
           r.getId(),
@@ -83,7 +84,8 @@ public final class RoutineResponses {
           r.getCategory(),
           r.getExercises().stream().map(ExerciseItem::from).toList(),
           r.getCreatedAt(),
-          r.getUpdatedAt());
+          r.getUpdatedAt(),
+          r.getInterExerciseRestSeconds());
     }
   }
 
@@ -128,7 +130,8 @@ public final class RoutineResponses {
       Integer targetReps,
       Integer targetDurationSeconds,
       BigDecimal weightKg,
-      int restSeconds) {
+      int restSeconds,
+      Integer timeLimitSeconds) {
     public static SetItem from(RoutineSet s) {
       return new SetItem(
           s.getId(),
@@ -136,7 +139,8 @@ public final class RoutineResponses {
           s.getTargetReps(),
           s.getTargetDurationSeconds(),
           s.getWeightKg(),
-          s.getRestSeconds());
+          s.getRestSeconds(),
+          s.getTimeLimitSeconds());
     }
   }
 

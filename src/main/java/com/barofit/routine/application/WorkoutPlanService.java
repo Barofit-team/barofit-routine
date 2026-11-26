@@ -1,6 +1,7 @@
 package com.barofit.routine.application;
 
 import com.barofit.routine.domain.*;
+import com.barofit.routine.dto.DailyRoutineCustomization;
 import com.barofit.routine.dto.RoutineResponses.Detail;
 import com.barofit.routine.dto.RoutineResponses.ExerciseItem;
 import com.barofit.routine.repository.*;
@@ -109,6 +110,67 @@ public class WorkoutPlanService {
   }
 
   @Transactional
+  public Day customize(UUID userId, LocalDate date, DailyRoutineCustomization input, String token) {
+    Routine source =
+        routines
+            .findById(input.sourceRoutineId())
+            .filter(r -> r.getType() == RoutineType.TEMPLATE || userId.equals(r.getOwnerUserId()))
+            .orElseThrow(() -> new RoutineException(RoutineErrorCode.ROUTINE_NOT_FOUND));
+    if (java.time.Duration.between(source.getUpdatedAt(), input.sourceUpdatedAt())
+            .abs()
+            .compareTo(java.time.Duration.ofMillis(1))
+        > 0) throw new RoutineException(RoutineErrorCode.PLAN_CONFLICT);
+    var existing = plans.findByOwnerUserIdAndPlanDate(userId, date);
+    UUID current = existing.map(p -> p.getRoutine().getId()).orElse(null);
+    if (!Objects.equals(current, input.expectedRoutineId()))
+      throw new RoutineException(RoutineErrorCode.PLAN_CONFLICT);
+    Map<UUID, RoutineExercise> allowed = new HashMap<>();
+    for (var e : source.getExercises()) allowed.put(e.getId(), e);
+    Set<UUID> used = new HashSet<>();
+    for (var edit : input.exercises()) {
+      var e = allowed.get(edit.sourceRoutineExerciseId());
+      if (e == null
+          || !used.add(edit.sourceRoutineExerciseId())
+          || !CatalogVisibility.available(e.getExercise()))
+        throw new RoutineException(RoutineErrorCode.INVALID_PLAN);
+      for (var set : edit.sets()) {
+        boolean reps = e.getExercise().getMeasurementType() == MeasurementType.REPS;
+        if (reps
+            ? set.targetReps() == null
+                || set.targetDurationSeconds() != null
+                || set.timeLimitSeconds() == null
+            : set.targetDurationSeconds() == null
+                || set.targetReps() != null
+                || set.timeLimitSeconds() != null)
+          throw new RoutineException(RoutineErrorCode.INVALID_PLAN);
+      }
+    }
+    Routine copy = Routine.copyForDate(userId, source, input.interExerciseRestSeconds());
+    int order = 1;
+    for (var edit : input.exercises()) {
+      var e =
+          new RoutineExercise(
+              copy, allowed.get(edit.sourceRoutineExerciseId()).getExercise(), order++);
+      int setOrder = 1;
+      for (var target : edit.sets()) {
+        var set =
+            new RoutineSet(
+                e,
+                setOrder++,
+                target.targetReps(),
+                target.targetDurationSeconds(),
+                target.weightKg(),
+                target.restSeconds());
+        set.changeTimeLimit(target.timeLimitSeconds());
+        e.addSet(set);
+      }
+      copy.addExercise(e);
+    }
+    routines.saveAndFlush(copy);
+    return assign(userId, date, copy.getId(), token);
+  }
+
+  @Transactional
   public void remove(UUID userId, LocalDate date) {
     plans.findByOwnerUserIdAndPlanDate(userId, date).ifPresent(plans::delete);
   }
@@ -160,7 +222,7 @@ public class WorkoutPlanService {
       ExerciseItem item = items.get(i);
       steps.add(new Step(StepType.EXERCISE, item, null));
       if (i + 1 < items.size()) {
-        steps.add(new Step(StepType.REST, null, item.sets().getLast().restSeconds()));
+        steps.add(new Step(StepType.REST, null, routine.getInterExerciseRestSeconds()));
       }
     }
     WorkoutEstimate.Result estimate = WorkoutEstimate.of(routine, weightKg);

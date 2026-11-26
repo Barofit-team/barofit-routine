@@ -50,7 +50,7 @@ class TemplateRecommendationPolicyTest {
     assertThat(result.recommendations().stream().map(r -> r.template().category()).toList())
         .doesNotHaveDuplicates();
     assertThat(result.recommendations().getFirst().template().category().name())
-        .isEqualTo("FULL_BODY");
+        .isEqualTo("CARDIO");
     assertThat(result.recommendations())
         .allMatch(TemplateRecommendationService.Recommendation::assessmentReady);
   }
@@ -93,7 +93,7 @@ class TemplateRecommendationPolicyTest {
             .toList();
     assertThat(excluded).isNotEmpty();
     assertThat(service.templates(null, null))
-        .hasSize(11)
+        .hasSize(35)
         .extracting(t -> t.id())
         .containsAll(excluded.stream().map(t -> t.getId()).toList());
     for (var template : excluded) {
