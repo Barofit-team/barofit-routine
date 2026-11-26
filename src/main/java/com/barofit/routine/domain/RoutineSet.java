@@ -28,6 +28,11 @@ public class RoutineSet {
 
   private Integer targetReps;
   private Integer targetDurationSeconds;
+  private Integer timeLimitSeconds;
+
+  public void changeTimeLimit(Integer seconds) {
+    this.timeLimitSeconds = seconds;
+  }
 
   @Column(nullable = false, precision = 6, scale = 2)
   private BigDecimal weightKg;

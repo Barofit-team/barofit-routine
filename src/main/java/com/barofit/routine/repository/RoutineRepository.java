@@ -17,7 +17,7 @@ public interface RoutineRepository extends JpaRepository<Routine, UUID> {
   Optional<Routine> findByIdAndOwnerUserIdAndType(UUID id, UUID ownerUserId, RoutineType type);
 
   @Query(
-      "select r from Routine r where r.ownerUserId = :ownerUserId and r.type = :type and r.exercises is not empty and not exists (select e.id from RoutineExercise e where e.routine = r and (e.exercise.active = false or e.exercise.assessmentStatus <> com.barofit.routine.domain.AssessmentStatus.READY))")
+      "select r from Routine r where r.ownerUserId = :ownerUserId and r.type = :type and r.dateScoped = false and r.exercises is not empty and not exists (select e.id from RoutineExercise e where e.routine = r and (e.exercise.active = false or e.exercise.assessmentStatus <> com.barofit.routine.domain.AssessmentStatus.READY))")
   Page<Routine> findByOwnerUserIdAndType(UUID ownerUserId, RoutineType type, Pageable pageable);
 
   List<Routine> findByTypeOrderByCreatedAtAscIdAsc(RoutineType type);
