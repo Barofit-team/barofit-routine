@@ -6,6 +6,7 @@ import com.barofit.routine.RoutineIntegrationTest;
 import com.barofit.routine.domain.RoutineType;
 import com.barofit.routine.repository.ExerciseRepository;
 import com.barofit.routine.repository.RoutineRepository;
+import java.math.BigDecimal;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +57,21 @@ class TemplateRecommendationPolicyTest {
         .allMatch(r -> r.template().difficulty().name().equals("BEGINNER"));
     assertThat(result.recommendations())
         .allMatch(TemplateRecommendationService.Recommendation::assessmentReady);
+  }
+
+  @Test
+  void weightKgPresentPopulatesEstimatedKcalButAbsentLeavesItNull() {
+    var profile = new TemplateRecommendationService.Profile("ENDURANCE", "BEGINNER", 3, Set.of());
+    var templates = routines.findByTypeOrderByCreatedAtAscIdAsc(RoutineType.TEMPLATE);
+
+    var withoutWeight = TemplateRecommendationService.select(profile, templates);
+    assertThat(withoutWeight.recommendations()).allMatch(r -> r.estimatedKcal() == null);
+
+    var withWeight =
+        TemplateRecommendationService.select(profile, templates, BigDecimal.valueOf(65));
+    assertThat(withWeight.recommendations())
+        .isNotEmpty()
+        .allMatch(r -> r.estimatedKcal() != null && r.estimatedKcal() > 0);
   }
 
   @Test
