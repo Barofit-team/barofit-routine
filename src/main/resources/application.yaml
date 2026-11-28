@@ -12,6 +12,15 @@ spring:
     hibernate:
       # 스키마는 Flyway만 변경
       ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          # 모든 PK가 애플리케이션에서 생성하는 UUID(GenerationType.UUID)라 배치 INSERT에 제약이 없음.
+          # 미설정 시 루틴 생성 1건당 routine+routine_exercise+routine_set INSERT가 개별 라운드트립으로
+          # 전송돼 HikariCP 커넥션을 불필요하게 오래 점유한다 (trouble/2026-11-28 조사 참고).
+          batch_size: 25
+        order_inserts: true
+        order_updates: true
 
 barofit:
   identity:
