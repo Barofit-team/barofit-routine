@@ -3,6 +3,7 @@ package com.barofit.routine.application;
 import com.barofit.routine.domain.*;
 import com.barofit.routine.dto.RoutineResponses.Detail;
 import com.barofit.routine.repository.RoutineRepository;
+import java.math.BigDecimal;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.*;
@@ -31,7 +32,8 @@ public class TemplateRecommendationService {
         RestClient.builder().baseUrl(identityBaseUrl).requestFactory(requestFactory).build();
   }
 
-  public record Recommendation(Detail template, String reason, boolean assessmentReady) {}
+  public record Recommendation(
+      Detail template, String reason, boolean assessmentReady, Integer estimatedKcal) {}
 
   public record Result(List<Recommendation> recommendations, String notice) {}
 
@@ -58,11 +60,20 @@ public class TemplateRecommendationService {
       throw new RoutineException(RoutineErrorCode.ONBOARDING_REQUIRED);
     }
     Profile profile = Profile.from(me.path("profile"));
+    BigDecimal weightKg =
+        me.path("profile").path("weightKg").isNumber()
+            ? me.path("profile").path("weightKg").decimalValue()
+            : null;
     List<Routine> candidates = routines.findByTypeOrderByCreatedAtAscIdAsc(RoutineType.TEMPLATE);
-    return select(profile, candidates);
+    return select(profile, candidates, weightKg);
   }
 
   static Result select(Profile profile, List<Routine> templates) {
+    return select(profile, templates, null);
+  }
+
+  /** 추천 루틴마다 예상 칼로리(estimatedKcal)도 함께 계산한다. weightKg가 없으면 null. */
+  static Result select(Profile profile, List<Routine> templates, BigDecimal weightKg) {
     Difficulty target =
         switch (profile.experienceLevel) {
           case "NOVICE", "BEGINNER" -> Difficulty.BEGINNER;
@@ -131,7 +142,8 @@ public class TemplateRecommendationService {
                     reason(t, target, priority.getFirst()),
                     t.getExercises().stream()
                         .allMatch(
-                            e -> e.getExercise().getAssessmentStatus() == AssessmentStatus.READY)))
+                            e -> e.getExercise().getAssessmentStatus() == AssessmentStatus.READY),
+                    WorkoutEstimate.of(t, weightKg).estimatedKcal()))
             .toList();
     String notice =
         results.size() < 2
